@@ -32,90 +32,227 @@ def generate_course_colors(courses):
 
 
 def export_to_excel(timetable, courses, filename='output/timetable.xlsx'):
-    """Export timetable to color-coded Excel file."""
+    """Export timetable to grid-style Excel file with all breaks shown."""
     import openpyxl
     from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
-    from openpyxl.utils.dataframe import dataframe_to_rows
     
-    # Create output directory
     os.makedirs('output', exist_ok=True)
     
     # Generate color mapping
     course_colors = generate_course_colors(courses)
     
-    # Prepare data for export
-    data = []
+    # Get all unique student groups
+    groups = set()
     for assignment in timetable.assignments:
-        data.append({
-            'Day': assignment.slot.day,
-            'Time': f"{assignment.slot.start_time}-{assignment.slot.end_time}",
-            'Course Code': assignment.course.code,
-            'Course Title': assignment.course.title,
-            'L-T-P-S-C': assignment.course.ltpsc,
-            'Faculty': assignment.faculty.name,
-            'Room': assignment.room.room_id,
-            'Student Group': assignment.student_group
-        })
-    
-    df = pd.DataFrame(data)
-    
-    # Sort by student group, day, and time
-    day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-    df['Day'] = pd.Categorical(df['Day'], categories=day_order, ordered=True)
-    df = df.sort_values(['Student Group', 'Day', 'Time'])
+        groups.add(assignment.student_group)
     
     # Create workbook
     wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "Timetable"
+    wb.remove(wb.active)  # Remove default sheet
     
-    # Write data with formatting
-    for r_idx, row in enumerate(dataframe_to_rows(df, index=False, header=True), 1):
-        for c_idx, value in enumerate(row, 1):
-            cell = ws.cell(row=r_idx, column=c_idx, value=value)
+    # Define complete schedule with breaks
+    complete_schedule = [
+        ('09:00-10:00', 'class'),
+        ('10:00-10:10', 'break'),
+        ('10:10-11:10', 'class'),
+        ('11:10-11:20', 'break'),
+        ('11:20-12:20', 'class'),
+        ('12:20-12:30', 'break'),
+        ('12:30-13:20', 'class'),
+        ('13:20-13:30', 'break'),
+        ('13:30-14:00', 'lunch'),
+        ('14:00-15:00', 'class'),
+        ('15:00-15:10', 'break'),
+        ('15:10-16:10', 'class'),
+        ('16:10-16:20', 'break'),
+        ('16:20-17:20', 'class'),
+        ('17:20-17:30', 'break'),
+        ('17:30-18:00', 'class'),
+    ]
+    
+    # Create a sheet for each student group
+    for group in sorted(groups):
+        if '&' in group:  # Skip combined groups
+            continue
+        
+        ws = wb.create_sheet(title=group)
+        
+        days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+        
+        # Create header row (Time slots with breaks)
+        ws.cell(1, 1, "Day/Time").fill = PatternFill(start_color="2C3E50", end_color="2C3E50", fill_type="solid")
+        ws.cell(1, 1).font = Font(color="FFFFFF", bold=True, size=11)
+        ws.cell(1, 1).alignment = Alignment(horizontal="center", vertical="center")
+        ws.column_dimensions['A'].width = 12
+        
+        for col_idx, (time_slot, slot_type) in enumerate(complete_schedule, start=2):
+            cell = ws.cell(1, col_idx, time_slot)
             
-            # Style header row
-            if r_idx == 1:
-                cell.fill = PatternFill(start_color="2C3E50", end_color="2C3E50", fill_type="solid")
-                cell.font = Font(color="FFFFFF", bold=True, size=12)
-                cell.alignment = Alignment(horizontal="center", vertical="center")
+            if slot_type == 'lunch':
+                cell.fill = PatternFill(start_color="E74C3C", end_color="E74C3C", fill_type="solid")
+            elif slot_type == 'break':
+                cell.fill = PatternFill(start_color="95A5A6", end_color="95A5A6", fill_type="solid")
             else:
-                # Color code by course
-                course_code = ws.cell(row=r_idx, column=3).value  # Course Code column
-                if course_code in course_colors:
-                    color = course_colors[course_code]
-                    for col in range(1, 9):
-                        ws.cell(row=r_idx, column=col).fill = PatternFill(
-                            start_color=color,
-                            end_color=color,
-                            fill_type="solid"
-                        )
+                cell.fill = PatternFill(start_color="2C3E50", end_color="2C3E50", fill_type="solid")
+            
+            cell.font = Font(color="FFFFFF", bold=True, size=9)
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            ws.column_dimensions[cell.column_letter].width = 12
+        
+        # Fill in the grid
+        for row_idx, day in enumerate(days, start=2):
+            # Day name cell
+            cell = ws.cell(row_idx, 1, day.upper())
+            cell.fill = PatternFill(start_color="34495E", end_color="34495E", fill_type="solid")
+            cell.font = Font(color="FFFFFF", bold=True, size=11)
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            ws.row_dimensions[row_idx].height = 60
+            
+            # Fill time slots
+            for col_idx, (time_slot, slot_type) in enumerate(complete_schedule, start=2):
+                cell = ws.cell(row_idx, col_idx)
+                
+                if slot_type == 'lunch':
+                    cell.value = "LUNCH\nBREAK"
+                    cell.fill = PatternFill(start_color="FADBD8", end_color="FADBD8", fill_type="solid")
+                    cell.font = Font(bold=True, size=9)
+                    cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                
+                elif slot_type == 'break':
+                    cell.value = "Break"
+                    cell.fill = PatternFill(start_color="D5DBDB", end_color="D5DBDB", fill_type="solid")
+                    cell.font = Font(size=8, italic=True)
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                
+                else:  # class slot
+                    # Find assignment for this day and time
+                    assignment = None
+                    for a in timetable.assignments:
+                        if (a.student_group == group and 
+                            a.slot.day == day and 
+                            f"{a.slot.start_time}-{a.slot.end_time}" == time_slot):
+                            assignment = a
+                            break
+                    
+                    if assignment:
+                        # Format: Course Code\nCourse Title\nFaculty\nRoom
+                        cell_text = f"{assignment.course.code}\n{assignment.course.title}\n{assignment.faculty.name}\n{assignment.room.room_id}"
+                        cell.value = cell_text
+                        
+                        # Apply course color
+                        color = course_colors.get(assignment.course.code, "FFFFFF")
+                        cell.fill = PatternFill(start_color=color, end_color=color, fill_type="solid")
+                        cell.font = Font(size=8, bold=False)
+                        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                    else:
+                        # Empty slot
+                        cell.value = ""
+                        cell.fill = PatternFill(start_color="F8F9FA", end_color="F8F9FA", fill_type="solid")
                 
                 # Add borders
                 thin_border = Border(
-                    left=Side(style='thin'),
-                    right=Side(style='thin'),
-                    top=Side(style='thin'),
-                    bottom=Side(style='thin')
+                    left=Side(style='thin', color='000000'),
+                    right=Side(style='thin', color='000000'),
+                    top=Side(style='thin', color='000000'),
+                    bottom=Side(style='thin', color='000000')
                 )
                 cell.border = thin_border
-                cell.alignment = Alignment(vertical="center")
     
-    # Adjust column widths
-    ws.column_dimensions['A'].width = 12
-    ws.column_dimensions['B'].width = 15
-    ws.column_dimensions['C'].width = 12
-    ws.column_dimensions['D'].width = 35
-    ws.column_dimensions['E'].width = 15
-    ws.column_dimensions['F'].width = 25
-    ws.column_dimensions['G'].width = 10
-    ws.column_dimensions['H'].width = 18
+    # Create Faculty Sheets
+    faculty_dict = {}
+    for assignment in timetable.assignments:
+        fid = assignment.faculty.faculty_id
+        if fid not in faculty_dict:
+            faculty_dict[fid] = {
+                'name': assignment.faculty.name,
+                'assignments': []
+            }
+        faculty_dict[fid]['assignments'].append(assignment)
     
-    # Freeze header row
-    ws.freeze_panes = 'A2'
+    for faculty_id, faculty_data in sorted(faculty_dict.items()):
+        # Sanitize sheet name
+        sheet_name = faculty_data['name'][:28]
+        if len(faculty_data['name']) > 28:
+            sheet_name += "..."
+        ws = wb.create_sheet(title=sheet_name)
+        
+        days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+        
+        # Header row
+        ws.cell(1, 1, "Day/Time").fill = PatternFill(start_color="2C3E50", end_color="2C3E50", fill_type="solid")
+        ws.cell(1, 1).font = Font(color="FFFFFF", bold=True, size=11)
+        ws.cell(1, 1).alignment = Alignment(horizontal="center", vertical="center")
+        ws.column_dimensions['A'].width = 12
+        
+        for col_idx, (time_slot, slot_type) in enumerate(complete_schedule, start=2):
+            cell = ws.cell(1, col_idx, time_slot)
+            
+            if slot_type == 'lunch':
+                cell.fill = PatternFill(start_color="E74C3C", end_color="E74C3C", fill_type="solid")
+            elif slot_type == 'break':
+                cell.fill = PatternFill(start_color="95A5A6", end_color="95A5A6", fill_type="solid")
+            else:
+                cell.fill = PatternFill(start_color="2C3E50", end_color="2C3E50", fill_type="solid")
+            
+            cell.font = Font(color="FFFFFF", bold=True, size=9)
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            ws.column_dimensions[cell.column_letter].width = 12
+        
+        # Fill grid
+        for row_idx, day in enumerate(days, start=2):
+            cell = ws.cell(row_idx, 1, day.upper())
+            cell.fill = PatternFill(start_color="34495E", end_color="34495E", fill_type="solid")
+            cell.font = Font(color="FFFFFF", bold=True, size=11)
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            ws.row_dimensions[row_idx].height = 60
+            
+            for col_idx, (time_slot, slot_type) in enumerate(complete_schedule, start=2):
+                cell = ws.cell(row_idx, col_idx)
+                
+                if slot_type == 'lunch':
+                    cell.value = "LUNCH\nBREAK"
+                    cell.fill = PatternFill(start_color="FADBD8", end_color="FADBD8", fill_type="solid")
+                    cell.font = Font(bold=True, size=9)
+                    cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                
+                elif slot_type == 'break':
+                    cell.value = "Break"
+                    cell.fill = PatternFill(start_color="D5DBDB", end_color="D5DBDB", fill_type="solid")
+                    cell.font = Font(size=8, italic=True)
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                
+                else:  # class slot
+                    # Find assignment
+                    assignment = None
+                    for a in faculty_data['assignments']:
+                        if (a.slot.day == day and 
+                            f"{a.slot.start_time}-{a.slot.end_time}" == time_slot):
+                            assignment = a
+                            break
+                    
+                    if assignment:
+                        cell_text = f"{assignment.course.code}\n{assignment.course.title}\n{assignment.student_group}\n{assignment.room.room_id}"
+                        cell.value = cell_text
+                        
+                        color = course_colors.get(assignment.course.code, "FFFFFF")
+                        cell.fill = PatternFill(start_color=color, end_color=color, fill_type="solid")
+                        cell.font = Font(size=8)
+                        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                    else:
+                        cell.value = ""
+                        cell.fill = PatternFill(start_color="F8F9FA", end_color="F8F9FA", fill_type="solid")
+                
+                thin_border = Border(
+                    left=Side(style='thin', color='000000'),
+                    right=Side(style='thin', color='000000'),
+                    top=Side(style='thin', color='000000'),
+                    bottom=Side(style='thin', color='000000')
+                )
+                cell.border = thin_border
     
     wb.save(filename)
-    print(f"\n✓ Color-coded timetable exported to {filename}")
+    print(f"\n✓ Grid-style timetable with breaks exported to {filename}")
+    print(f"  → Created {len(wb.sheetnames)} sheets (student groups + faculty)")
 
 
 def print_failed_schedules(failed_schedules):

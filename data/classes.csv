@@ -1,12 +1,29 @@
-course_code,course_name,type,semester,batch,lectures_per_week,duration_minutes,students,room_type,credits
-MA261,Differential Equations,Half sem,3,CSE,2+1+0,240,170,C004,2
-MA262,Multivariate Calculus,Half sem,3,CSE,2+1+0,240,170,C004,2
-MA261,Operationg System,Half sem,3,CSE,3+0+0,240,170,C004,2
-CS262,Software Design Tools And Techniques,Full sem,3,CSE,2+0+2,300,170,C203,3
-CS263,Design & Analysis of Algorithm,Full sem,3,CSE,3+0+2,300,170,C203,4
-CS264,Computer Networks,Full sem,3,CSE,3+1+0,240,170,C304,4
-HS261,HSS(Ethics & Values),Half sem,3,CSE,2+1,120,170,C004,2
-EC251,Electronics System Design - I,Half sem,2,CSE,,240,40,,2
-EC252,Introductioon to RFIC Design,Half sem,2,CSE,,240,30,,2
-CS152,Data Science with Python,Half sem,2,CSE,,240,60,,2
-CS251,2D Computer Graphics,Half sem,2,CSE,,240,40,,2
+"course_code	",course_name,type,semester,batch,lectures_per_week (LTP),duration_minutes per week,students,room_type,preferred_slots,credits
+MA261,Differential Equation,Half sem,3,CSE,2+1+0,240,170,240 Seater,evening,2
+MA262,Multivariate Calculus,Half sem,3,CSE,2+1+0,240,170,240 Seater,evening,2
+CS261,Operating System,Half sem,3,CSE,3-0-0,240,170,Classroom,evening,2
+CS262,Software Design Tools And Techniques ,Full sem,3,CSE,2+0+2,300,85,Classroom,morning,3
+CS263,Design & Analysis of Algorithm ,Full sem,3,CSE,3+0+2,300,85,Classroom,morning,4
+CS264,Computer Networks,Full sem,3,CSE,3+1+0,300,85,120 Seater,morning,4
+HS261,HSS(Ethics & Values),Half sem,3,CSE,2+1+0,240,170,240 Seater,evening,2
+EC251,Electronic System Design-1,Half sem,3,"CSE,ECE,DSAI",2+1+0,240,45,Classroom,morning,2
+EC252,Introduction to RFIC Design,Half sem,3,"CSE,ECE,DSAI",2+1+0,240,62,Classroom,morning,2
+NEW,Introduction to Embedded Signal Intelligence,Half sem,3,"CSE,ECE,DSAI",2+1+0,240,25,Classroom,morning,2
+NEW,Electronic Systems Engineering,Half sem,3,"CSE,ECE,DSAI",2+1+0,240,45,Classroom,morning,2
+CS152,Data Science with Python,Half sem,3,"CSE,ECE,DSAI",2+1+0,240,70,Classroom,morning,2
+CS251,2D Computer Graphics,Half sem,3,"CSE,ECE,DSAI",2+1+0,240,32,Classroom,morning,2
+,,,,,,,,,,
+,,,,,,,,,,
+,,,,,,,,,,
+,,,,,,,,,,
+,,,,,,,,,,
+,,,,,,,,,,
+,,,,,,,,,,
+,,,,,,,,,,
+,,,,,,,,,,
+,,,,,,,,,,
+,,,,,,,,,,
+,,,,,,,,,,
+,,,,,,,,,,
+,,,,,,,,,,
+,,,,,,,,,,

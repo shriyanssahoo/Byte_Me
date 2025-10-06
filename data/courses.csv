@@ -1,0 +1,14 @@
+code,title,lectures_p,faculty_id,student_group
+MA261,Differential Equation,2-1-0-0-2,F001,3rdSem
+CS263,Design Analysis and Algorithms,3-0-2-0-4,F002,3rdSem-A&B
+MA262,Multivariate Calculus,2-1-0-0-2,F003,3rdSem
+CS262,Software Design Tools And Techniques,2-0-2-0-3,F004,3rdSem-A&B
+CS264,Computer Networks,3-1-0-0-4,F005,3rdSem-A&B
+CS261,Operating Systems,3-0-0-4-2,F006,3rdSem-B
+EC251,Electronic System Design-1,2-1-0-0-2,F007,3rdSem
+EC252,Introduction to RFIC Design,2-1-0-0-2,F008,3rdSem
+NEW,Introduction to Embedded Signal Intelligence,2-1-0-0-2,F009,3rdSem
+NEW,Electronic Systems Engineering,2-1-0-0-2,F010,3rdSem
+CS152,Data Science with Python,2-1-0-0-2,F011,3rdSem
+CS251,2D Computer Graphics,2-1-0-0-2,F012,3rdSem
+HS261,HSS(Ethics & Values) + Environmental Studies,2-1-0-0-3,F013,3rdSem

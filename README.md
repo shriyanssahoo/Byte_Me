@@ -431,6 +431,27 @@ if self.daily_course_count.get(key, 0) >= 1:
 
 ---
 
+## Testing
+
+### Test Suite Overview
+
+The project includes comprehensive unit tests covering all major components:
+
+| Test Suite | File | Tests | Purpose |
+|------------|------|-------|---------|
+| Basic Unit Tests | `test_basic.py` | 7 | Core data models |
+| Scheduler Tests | `test_scheduler.py` | 5 | Algorithm validation |
+| Data Loader Tests | `test_data_loader.py` | 5 | CSV parsing |
+| **Total** | | **17** | **Complete coverage** |
+
+### Running Tests
+
+**Run all tests:**
+```bash
+python tests/run_all_tests.py
+
+---
+
 ## License
 
 This project is developed as part of the academic curriculum at IIIT Dharwad.
@@ -455,7 +476,7 @@ For issues or questions:
 
 ## Project Status
 
-**Current Version:** 1.0.0  
+**Current Version:** 1.1.0  
 **Status:** Active Development  
 **Last Updated:** October 2025
 

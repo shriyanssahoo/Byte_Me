@@ -325,8 +325,6 @@ The system uses a **greedy scheduling algorithm with intelligent distribution**:
 
 ---
 
-## Testing
-
 ### Run Unit Tests
 
 ```bash
@@ -338,6 +336,26 @@ or using pytest:
 ```bash
 pytest tests/
 ```
+## Testing
+
+### Test Suite Overview
+
+The project includes comprehensive unit tests covering all major components:
+
+| Test Suite | File | Tests | Purpose |
+|------------|------|-------|---------|
+| Basic Unit Tests | `test_basic.py` | 7 | Core data models |
+| Scheduler Tests | `test_scheduler.py` | 5 | Algorithm validation |
+| Data Loader Tests | `test_data_loader.py` | 5 | CSV parsing |
+| **Total** | | **17** | **Complete coverage** |
+
+### Running Tests
+
+**Run all tests:**
+```bash
+python tests/run_all_tests.py
+
+---
 
 ### Test Coverage
 
@@ -428,27 +446,6 @@ if self.daily_course_count.get(key, 0) >= 1:
 3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
-
----
-
-## Testing
-
-### Test Suite Overview
-
-The project includes comprehensive unit tests covering all major components:
-
-| Test Suite | File | Tests | Purpose |
-|------------|------|-------|---------|
-| Basic Unit Tests | `test_basic.py` | 7 | Core data models |
-| Scheduler Tests | `test_scheduler.py` | 5 | Algorithm validation |
-| Data Loader Tests | `test_data_loader.py` | 5 | CSV parsing |
-| **Total** | | **17** | **Complete coverage** |
-
-### Running Tests
-
-**Run all tests:**
-```bash
-python tests/run_all_tests.py
 
 ---
 

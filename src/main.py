@@ -418,5 +418,47 @@ def main():
     print("=" * 90)
 
 
+def show_menu():
+    """Display main menu."""
+    print("\n" + "=" * 90)
+    print("AUTOMATED TIMETABLE SYSTEM - IIIT Dharwad".center(90))
+    print("Team: Byte Me".center(90))
+    print("=" * 90)
+    print("\nPlease select an option:")
+    print("  1. Generate Class Timetable")
+    print("  2. Generate Exam Timetable & Seating Arrangement")
+    print("  3. Exit")
+    print("\n" + "-" * 90)
+    
+    choice = input("Enter your choice (1-3): ").strip()
+    return choice
+
+
+def main_menu():
+    """Main menu handler."""
+    while True:
+        choice = show_menu()
+        
+        if choice == '1':
+            main()
+        elif choice == '2':
+            # Import and run exam module
+            from exam_main import generate_exam_timetable
+            generate_exam_timetable()
+        elif choice == '3':
+            print("\n👋 Thank you for using the Timetable System!")
+            break
+        else:
+            print("\n❌ Invalid choice. Please enter 1, 2, or 3.")
+        
+        input("\nPress Enter to continue...")
+
+
 if __name__ == "__main__":
-    main()
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == '--class-only':
+        # Direct class timetable generation
+        main()
+    else:
+        # Show menu
+        main_menu()

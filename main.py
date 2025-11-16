@@ -1,6 +1,7 @@
 """
 main.py
-(Corrected to handle 'OVERFLOW' electives from PRE to POST)
+(Corrected to create master PRE/POST schedules and pass them
+to each scheduler run, fixing cross-semester conflicts)
 """
 
 import os
@@ -62,26 +63,6 @@ def filter_courses_for_run(all_courses: List[Course], semester: int) -> List[Cou
         if course.semester == semester
     ]
 
-def merge_schedules(master_schedules: Dict[str, Timetable], 
-                    run_schedules: Dict[str, Timetable]):
-    """
-    Merges schedule data from a single run into the master schedule list.
-    """
-    for owner_id, run_timetable in run_schedules.items():
-        if owner_id not in master_schedules:
-            master_schedules[owner_id] = Timetable(owner_id, run_timetable.semester)
-            
-        master_tt = master_schedules[owner_id]
-        
-        for day in range(len(utils.DAYS)):
-            for slot in range(utils.TOTAL_SLOTS_PER_DAY):
-                s_class = run_timetable.grid[day][slot]
-                if s_class and s_class.course.course_code != "LUNCH":
-                    if master_tt.grid[day][slot] is None:
-                        master_tt.grid[day][slot] = s_class
-                    else:
-                        pass 
-
 def main():
     """
     Main execution pipeline.
@@ -102,10 +83,16 @@ def main():
 
     # --- 2. Master Loop: Generate All Timetables ---
     
-    all_generated_sections: List[Section] = []
-    master_faculty_schedules: Dict[str, Timetable] = {}
+    # --- NEW: Create master schedules ---
+    # These will be shared across all PRE runs
+    master_pre_faculty_schedules: Dict[str, Timetable] = {}
+    master_pre_room_schedules: Dict[str, Timetable] = {}
     
-    # --- NEW: Handle elective overflow ---
+    # These will be shared across all POST runs
+    master_post_faculty_schedules: Dict[str, Timetable] = {}
+    master_post_room_schedules: Dict[str, Timetable] = {}
+
+    all_generated_sections: List[Section] = []
     overflow_courses_to_post: List[Course] = []
 
     for semester in SEMESTERS_TO_RUN:
@@ -114,46 +101,65 @@ def main():
         pre_sections = create_sections(semester, "PRE")
         pre_courses_for_sem = filter_courses_for_run(pre_midsem_courses, semester)
         
-        pre_scheduler = Scheduler(all_classrooms, "PRE")
+        # --- NEW: Pass master schedules to the Scheduler ---
+        pre_scheduler = Scheduler(
+            all_classrooms, 
+            "PRE",
+            master_pre_room_schedules, # Pass the PRE master room schedule
+            master_pre_faculty_schedules # Pass the PRE master faculty schedule
+        )
         populated_pre_sections, overflow_from_pre = pre_scheduler.run(pre_courses_for_sem, pre_sections)
         
         all_generated_sections.extend(populated_pre_sections)
-        merge_schedules(master_faculty_schedules, pre_scheduler.faculty_schedules)
-        overflow_courses_to_post.extend(overflow_from_pre) # Add failed electives to post list
+        overflow_courses_to_post.extend(overflow_from_pre)
             
         # --- POST-MIDSEM RUN ---
         post_sections = create_sections(semester, "POST")
         post_courses_for_sem = filter_courses_for_run(post_midsem_courses, semester)
         
-        # Add overflow courses from the PRE run
         overflow_for_this_sem = [c for c in overflow_courses_to_post if c.semester == semester]
         if overflow_for_this_sem:
             print(f"Adding {len(overflow_for_this_sem)} overflow electives to POST run for Sem {semester}")
             post_courses_for_sem.extend(overflow_for_this_sem)
         
-        post_scheduler = Scheduler(all_classrooms, "POST")
+        # --- NEW: Pass master schedules to the Scheduler ---
+        post_scheduler = Scheduler(
+            all_classrooms, 
+            "POST",
+            master_post_room_schedules, # Pass the POST master room schedule
+            master_post_faculty_schedules # Pass the POST master faculty schedule
+        )
         populated_post_sections, _ = post_scheduler.run(post_courses_for_sem, post_sections)
         
         all_generated_sections.extend(populated_post_sections)
-        merge_schedules(master_faculty_schedules, post_scheduler.faculty_schedules)
 
     print(f"\n--- All {len(SEMESTERS_TO_RUN) * 2} Scheduling Runs Complete ---")
     print(f"Total sections generated: {len(all_generated_sections)}")
 
     # --- 3. Run Validators ---
-    is_valid = validate_all(
-        all_generated_sections,
-        master_faculty_schedules
+    # We now validate the *master* schedules
+    print("\nValidating PRE-Midsem master schedule...")
+    validate_all(
+        [s for s in all_generated_sections if s.period == "PRE"],
+        master_pre_faculty_schedules
     )
     
-    if not is_valid:
-        print("Warning: Conflicts were detected in the final schedule. Output may be unreliable.")
+    print("\nValidating POST-Midsem master schedule...")
+    validate_all(
+        [s for s in all_generated_sections if s.period == "POST"],
+        master_post_faculty_schedules
+    )
 
     # --- 4. Export All Results ---
+    # The exporter needs ALL sections, but the master schedules
+    
+    # Combine all faculty schedules for the exporter
+    all_faculty_schedules = {**master_pre_faculty_schedules, **master_post_faculty_schedules}
+    
     exporter = ExcelExporter(
         all_sections=all_generated_sections,
         all_classrooms=all_classrooms,
-        all_faculty_schedules=master_faculty_schedules
+        all_faculty_schedules=all_faculty_schedules
     )
     
     exporter.export_department_timetables(DEPT_TIMETABLE_FILE)

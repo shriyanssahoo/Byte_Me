@@ -1,137 +1,229 @@
 """
-Data loader module to read input data from CSV files.
+src/data_loader.py
+(Corrected to fix the "0 processed courses" bug)
 """
 
-import pandas as pd
-from models import Course, Faculty, Room, Slot
+import csv
+from typing import List, Tuple, Dict
+from .models import Course, Classroom
+from . import utils 
+import os
+import copy
 
+def load_classrooms(filepath: str) -> List[Classroom]:
+    """
+    Reads the classroom_data.csv file and returns a list of Classroom objects.
+    """
+    print(f"Loading classrooms from {filepath}...")
+    classrooms = []
+    
+    if not os.path.exists(filepath):
+        print(f"Fatal Error: Classroom file not found at {filepath}")
+        return []
 
-class DataLoader:
-    """Loads all input data from CSV files."""
+    try:
+        with open(filepath, mode='r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                try:
+                    room_id = row.get("Room Number", "").strip().upper()
+                    if not room_id:
+                        continue
+                    
+                    try:
+                        capacity_int = int(row.get("Capacity", 0))
+                    except (ValueError, TypeError):
+                        capacity_int = 0
+                    
+                    classroom = Classroom(
+                        room_id=room_id,
+                        capacity=capacity_int,
+                        room_type=row.get("Type", "CLASSROOM").strip().upper(),
+                        floor=utils.get_floor_from_room(room_id),
+                        facilities=[f.strip() for f in row.get("Facilities", "").split(',')]
+                    )
+                    classrooms.append(classroom)
+                except Exception as e:
+                    print(f"Warning: Skipping invalid classroom row: {row}. Error: {e}")
+                    
+    except Exception as e:
+        print(f"Fatal Error: Could not read classroom file. {e}")
+        return []
     
-    def __init__(self, data_dir='data'):
-        self.data_dir = data_dir
-        self.courses = []
-        self.faculty = {}
-        self.rooms = []
-        self.slots = []
+    print(f"Successfully loaded {len(classrooms)} classrooms.")
+    return classrooms
+
+def _bundle_baskets_and_electives(courses: List[Course]) -> List[Course]:
+    """
+    Finds ALL elective/basket courses and bundles them into
+    CROSS-DEPARTMENTAL "pseudo-courses" based on (Semester, Basket Code).
+    """
+    print("Bundling electives and baskets...")
+    # Key = (Semester, Basket Code)
+    baskets: Dict[Tuple[int, str], List[Course]] = {}
+    courses_to_keep: List[Course] = []
     
-    def load_all_data(self):
-        """Load all data from CSV files."""
-        self.load_faculty()
-        self.load_rooms()
-        self.load_slots()
-        self.load_courses()
-        print(f"✓ Loaded {len(self.courses)} courses")
-        print(f"✓ Loaded {len(self.faculty)} faculty members")
-        print(f"✓ Loaded {len(self.rooms)} rooms")
-        print(f"✓ Loaded {len(self.slots)} time slots")
+    for course in courses:
+        pref = course.pre_post_preference.lower()
+        if (pref == 'elective' or pref == 'basket') and course.basket_code:
+            key = (course.semester, course.basket_code)
+            baskets.setdefault(key, []).append(course)
+        else:
+            courses_to_keep.append(course)
+            
+    print(f"Found {len(baskets)} cross-departmental elective/basket bundles.")
     
-    def load_courses(self):
-        """Load courses from courses.csv"""
-        try:
-            df = pd.read_csv(f'{self.data_dir}/courses.csv')
-            # Strip whitespace from column names
-            df.columns = df.columns.str.strip()
-            
-            # Find the lectures column - try multiple possible names
-            lectures_col = None
-            possible_names = ['lectures_p', 'lectures_per_week', 'lectures', 'ltpsc', 'L-T-P-S-C']
-            
-            for col_name in possible_names:
-                if col_name in df.columns:
-                    lectures_col = col_name
-                    break
-            
-            if not lectures_col:
-                # Show what columns we actually have
-                print(f"⚠ Available columns: {list(df.columns)}")
-                raise KeyError("Could not find lectures column. Expected one of: " + ", ".join(possible_names))
-            
-            for _, row in df.iterrows():
-                # Handle the lectures column (which contains L-T-P-S-C format)
-                ltpsc = str(row[lectures_col]).strip()
-                
-                course = Course(
-                    code=str(row['code']).strip(),
-                    title=str(row['title']).strip(),
-                    ltpsc=ltpsc,
-                    faculty_id=str(row['faculty_id']).strip(),
-                    student_group=str(row['student_group']).strip()
-                )
-                self.courses.append(course)
-                
-        except FileNotFoundError:
-            print(f"⚠ Warning: courses.csv not found in {self.data_dir}")
-        except KeyError as e:
-            print(f"⚠ Error loading courses: Missing column {e}")
-            print(f"   Expected columns: code, title, lectures_p, faculty_id, student_group")
-        except Exception as e:
-            print(f"⚠ Error loading courses: {e}")
-    
-    def load_faculty(self):
-        """Load faculty from faculty.csv"""
-        try:
-            df = pd.read_csv(f'{self.data_dir}/faculty.csv')
-            # Strip whitespace from column names
-            df.columns = df.columns.str.strip()
-            
-            for _, row in df.iterrows():
-                faculty = Faculty(
-                    faculty_id=str(row['faculty_id']).strip(),
-                    name=str(row['name']).strip(),
-                    max_hours_per_day=int(row.get('max_hours_per_day', 4))
-                )
-                self.faculty[str(row['faculty_id']).strip()] = faculty
-                
-        except FileNotFoundError:
-            print(f"⚠ Warning: faculty.csv not found in {self.data_dir}")
-        except Exception as e:
-            print(f"⚠ Error loading faculty: {e}")
-    
-    def load_rooms(self):
-        """Load rooms from rooms.csv"""
-        try:
-            df = pd.read_csv(f'{self.data_dir}/rooms.csv')
-            # Strip whitespace from column names
-            df.columns = df.columns.str.strip()
-            
-            for _, row in df.iterrows():
-                room = Room(
-                    room_id=str(row['room_id']).strip(),
-                    room_type=str(row['room_type']).strip(),
-                    capacity=int(row['capacity'])
-                )
-                self.rooms.append(room)
-                
-        except FileNotFoundError:
-            print(f"⚠ Warning: rooms.csv not found in {self.data_dir}")
-        except Exception as e:
-            print(f"⚠ Error loading rooms: {e}")
-    
-    def load_slots(self):
-        """Generate standard time slots for the week."""
-        # Define standard time slots (9 AM - 6 PM, with lunch 1:30-2:00 PM)
-        days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-        time_slots = [
-            ('09:00', '10:00'),
-            ('10:10', '11:10'),
-            ('11:20', '12:20'),
-            ('12:30', '13:20'),
-            # Lunch break 1:30 PM - 2:00 PM (skipped in scheduling)
-            ('14:00', '15:00'),
-            ('15:10', '16:10'),
-            ('16:20', '17:20'),
-            ('17:30', '18:00'),
-        ]
+    for key, bundle in baskets.items():
+        sem, basket = key
+        template = bundle[0]
         
-        slot_id = 0
-        for day in days:
-            for start, end in time_slots:
-                slot = Slot(slot_id, day, start, end)
-                self.slots.append(slot)
-                slot_id += 1
+        name_prefix = "Elective" if template.pre_post_preference.lower() == 'elective' else "Basket"
+        pseudo_dept = "ALL_DEPTS"
+        
+        pseudo_course = Course(
+            course_code=f"PSEUDO_{sem}_{basket}",
+            course_name=f"{name_prefix} ({basket})",
+            semester=sem,
+            department=pseudo_dept,
+            ltpsc_str=template.ltpsc_str,
+            credits=template.credits,
+            instructors=["TBD"],
+            registered_students=100,
+            is_elective=False,
+            is_half_semester=template.is_half_semester,
+            is_combined=False,
+            pre_post_preference=template.pre_post_preference, # Keep original 'elective' or 'basket' pref
+            basket_code="",
+            is_pseudo_basket=True
+        )
+        courses_to_keep.append(pseudo_course)
+        
+    print(f"Total courses after bundling: {len(courses_to_keep)}")
+    return courses_to_keep
+
+def load_and_process_courses(filepath: str) -> Tuple[List[Course], List[Course]]:
+    """
+    Main function to load courses from course.csv and process them into
+    Pre and Post mid-semester lists based on the 'Pre /Post' column.
+    """
+    print(f"Loading and processing courses from {filepath}...")
     
-    def get_faculty_by_id(self, faculty_id):
-        """Get faculty object by ID."""
-        return self.faculty.get(faculty_id)
+    all_courses: List[Course] = []
+    
+    if not os.path.exists(filepath):
+        print(f"Fatal Error: Course file not found at {filepath}")
+        return [], []
+
+    try:
+        with open(filepath, mode='r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            line_number = 1
+            for row in reader:
+                line_number += 1
+                try:
+                    course_code = row.get("Course Code", "").strip().upper()
+                    if not course_code:
+                        continue
+                    
+                    dept = row.get("Department", "UNKNOWN").strip().upper()
+                    is_elective = row.get("Elective (Yes/No)", "No").strip().upper().startswith("Y")
+                    is_half_sem = row.get("Half Semester (Yes/No)", "No").strip().upper().startswith("Y")
+                    is_combined = row.get("Combined class", "No").strip().upper().startswith("Y")
+                    
+                    instructors_str = row.get("Instructor", "TBD").strip()
+                    instructors = [name.strip() for name in instructors_str.split(',') if name.strip()]
+                    if not instructors:
+                        instructors = ["TBD"]
+                        
+                    semester = int(row.get("Semester", 0))
+                    
+                    if semester not in [1, 3, 5, 7]:
+                        continue
+                        
+                    course = Course(
+                        course_code=course_code,
+                        course_name=row.get("Course Name", "Untitled"),
+                        semester=semester,
+                        department=dept,
+                        ltpsc_str=row.get("LTPSC", "0-0-0-0-0"),
+                        credits=int(row.get("Credits", 0)),
+                        instructors=instructors,
+                        registered_students=int(row.get("Registered Students", 0)),
+                        is_elective=is_elective,
+                        is_half_semester=is_half_sem,
+                        is_combined=is_combined,
+                        pre_post_preference=row.get("Pre /Post", ""), # Keep case for now
+                        basket_code=row.get("Basket Code", "").strip()
+                    )
+                    
+                    all_courses.append(course)
+                        
+                except Exception as e:
+                    print(f"Warning: Skipping invalid course row (Line {line_number}): {row}. Error: {e}")
+
+    except Exception as e:
+        print(f"Fatal Error: Could not read course file. {e}")
+        return [], []
+
+    print(f"Loaded and validated {len(all_courses)} course offerings for Semesters 1, 3, 5, 7.")
+    
+    processed_courses = _bundle_baskets_and_electives(all_courses)
+    print(f"Bundling complete. Total processed courses: {len(processed_courses)}")
+
+    pre_midsem_courses: List[Course] = []
+    post_midsem_courses: List[Course] = []
+
+    for course_template in processed_courses:
+        course = copy.deepcopy(course_template)
+        
+        # --- THIS IS THE FIX ---
+        # The model's __post_init__ now correctly lowercases the preference.
+        # This loop now checks the (now-guaranteed) lowercase value.
+        pref = course.pre_post_preference 
+        
+        if pref == 'pre':
+            pre_midsem_courses.append(course)
+            
+        elif pref == 'post':
+            post_midsem_courses.append(course)
+            
+        elif pref == 'full':
+            pre_midsem_courses.append(course)
+            post_midsem_courses.append(copy.deepcopy(course))
+            
+        elif pref == 'pre/post':
+            course.pre_post_preference = "SPLIT"
+            pre_midsem_courses.append(course)
+            post_midsem_courses.append(copy.deepcopy(course))
+            
+        elif pref == 'elective':
+            course.pre_post_preference = "OVERFLOW"
+            pre_midsem_courses.append(course)
+            
+        elif pref == 'basket':
+            course.pre_post_preference = "BASKET_FULL"
+            pre_midsem_courses.append(course)
+            post_midsem_courses.append(copy.deepcopy(course))
+        
+        elif pref == '':
+            if course.is_half_semester:
+                if not course.is_elective:
+                    print(f"Warning: Course {course.course_code} is Half_Sem but has blank Pre/Post. Defaulting to SPLIT.")
+                    course.pre_post_preference = "SPLIT"
+                    pre_midsem_courses.append(course)
+                    post_midsem_courses.append(copy.deepcopy(course))
+                else:
+                    print(f"Warning: Course {course.course_code} is Elective but has blank Pre/Post. Defaulting to OVERFLOW.")
+                    course.pre_post_preference = "OVERFLOW"
+                    pre_midsem_courses.append(course)
+            else:
+                print(f"Warning: Course {course.course_code} has blank Pre/Post. Defaulting to FULL.")
+                course.pre_post_preference = "FULL"
+                pre_midsem_courses.append(course)
+                post_midsem_courses.append(copy.deepcopy(course))
+        
+        else:
+            print(f"Warning: Unknown Pre/Post preference '{pref}' for {course.course_code}. Skipping.")
+
+    print(f"Processed courses: {len(pre_midsem_courses)} pre-midsem definitions, {len(post_midsem_courses)} post-midsem definitions.")
+    return pre_midsem_courses, post_midsem_courses

@@ -1,0 +1,8 @@
+parameter,value
+exam_start_date,2025-12-01
+morning_slot_start,10:00
+morning_slot_2hr_end,12:00
+morning_slot_3hr_end,13:00
+afternoon_slot_start,14:00
+afternoon_slot_2hr_end,16:00
+afternoon_slot_3hr_end,17:00

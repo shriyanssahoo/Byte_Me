@@ -1,9 +1,6 @@
 """
 src/scheduler.py
-(Corrected with all fixes:
-1. Accepts master schedules in __init__
-2. Fixes basket double-booking
-3. Fixes CSE lab LTPSC mismatch)
+(Rebuilt to fix Phase 2 double-booking and Phase 3 LTPSC mismatch for CSE labs)
 """
 
 from typing import List, Dict, Optional, Tuple, Set
@@ -17,7 +14,6 @@ class Scheduler:
     The main scheduling engine.
     """
     
-    # --- NEW: Modified __init__ to accept master schedules ---
     def __init__(self, 
                  classrooms: List[Classroom], 
                  run_period: str,
@@ -29,33 +25,40 @@ class Scheduler:
         
         self.all_classrooms = classrooms
         self.room_lookup = {r.room_id: r for r in classrooms} 
-        self.c004_room = None
-        self.general_classrooms: List[Classroom] = []
+        self.c004_room: Optional[Classroom] = None
+        self.large_classrooms: List[Classroom] = []
+        self.small_classrooms: List[Classroom] = []
         self.labs: List[Classroom] = []
         
+        LARGE_ROOM_THRESHOLD = 100 
+
         for r in classrooms:
             if r.room_id == "C004":
                 self.c004_room = r
             elif r.room_type == "CLASSROOM":
-                self.general_classrooms.append(r)
+                if r.capacity > LARGE_ROOM_THRESHOLD:
+                    self.large_classrooms.append(r)
+                else:
+                    self.small_classrooms.append(r)
             elif r.room_type == "LAB":
                 self.labs.append(r)
+                
+        self.large_classrooms.sort(key=lambda r: r.capacity)
+        self.small_classrooms.sort(key=lambda r: r.capacity)
+        self.labs.sort(key=lambda r: r.capacity)
         
-        # --- NEW: Use the passed-in master schedules ---
         self.faculty_schedules = master_faculty_schedules
         self.room_schedules = master_room_schedules
         
         self.failed_courses: List[Tuple[Course, str]] = []
-        self.overflow_electives: List[Course] = [] # For 'elective' rule
+        self.overflow_electives: List[Course] = []
 
     def _get_or_create_faculty_schedule(self, faculty_name: str) -> Timetable:
-        # Uses the master schedule
         if faculty_name not in self.faculty_schedules:
             self.faculty_schedules[faculty_name] = Timetable(owner_id=faculty_name, semester=-1)
         return self.faculty_schedules[faculty_name]
 
     def _get_or_create_room_schedule(self, room_id: str) -> Timetable:
-        # Uses the master schedule
         if room_id not in self.room_schedules:
             if room_id not in self.room_lookup:
                 raise ValueError(f"Attempted to schedule in non-existent room: {room_id}")
@@ -92,22 +95,32 @@ class Scheduler:
     def _find_available_room(self, day: int, start_slot: int, duration: int, 
                              room_type: str, capacity: int) -> Optional[Classroom]:
         
+        room_pool: List[Classroom] = []
+        fallback_pool: List[Classroom] = []
+
         if room_type == "LAB":
             room_pool = self.labs
         else:
-            room_pool = self.general_classrooms
+            if capacity > 100:
+                room_pool = self.large_classrooms
+                fallback_pool = self.small_classrooms
+            else:
+                room_pool = self.small_classrooms
+                fallback_pool = self.large_classrooms
         
-        eligible_rooms = [r for r in room_pool if r.capacity >= capacity]
+        for room in room_pool:
+            if room.capacity >= capacity:
+                room_tt = self._get_or_create_room_schedule(room.room_id)
+                if room_tt.is_slot_free(day, start_slot, duration):
+                    return room
         
-        sorted_rooms = sorted(eligible_rooms, key=lambda r: r.capacity)
-        
-        random.shuffle(sorted_rooms)
-        
-        for room in sorted_rooms:
-            # Check the master room schedule
-            room_tt = self._get_or_create_room_schedule(room.room_id)
-            if room_tt.is_slot_free(day, start_slot, duration):
-                return room
+        for room in fallback_pool:
+            if room.capacity >= capacity:
+                room_tt = self._get_or_create_room_schedule(room.room_id)
+                if room_tt.is_slot_free(day, start_slot, duration):
+                    print(f"  Warning: Using fallback pool. Scheduled {capacity} students in room {room.room_id} ({room.capacity})")
+                    return room
+
         return None
     
     def _find_adjacent_labs(self, day: int, start_slot: int, duration: int, 
@@ -125,10 +138,9 @@ class Scheduler:
                 utils.get_room_number_from_id(lab2.room_id) != utils.get_room_number_from_id(lab1.room_id) + 1):
                 continue
                 
-            if (lab1.capacity + lab2.capacity) * 1.25 < capacity: # 80% tolerance
+            if (lab1.capacity + lab2.capacity) * 1.25 < capacity:
                 continue
                 
-            # Check master room schedules
             lab1_tt = self._get_or_create_room_schedule(lab1.room_id)
             lab2_tt = self._get_or_create_room_schedule(lab2.room_id)
             
@@ -171,8 +183,7 @@ class Scheduler:
                 )
                 if not sections_free:
                     continue
-                
-                # Check master faculty schedule
+
                 faculty_free = self._check_faculty_availability(instructors, day, start_slot, duration)
                 if not faculty_free:
                     continue
@@ -196,12 +207,10 @@ class Scheduler:
         for instructor in booking.instructors:
             if instructor == "TBD":
                 continue
-            # Book on master faculty schedule
             faculty_tt = self._get_or_create_faculty_schedule(instructor)
             faculty_tt.book_slot(day, start_slot, duration, booking)
             
         for room in rooms:
-            # Book on master room schedule
             room_tt = self._get_or_create_room_schedule(room.room_id)
             room_tt.book_slot(day, start_slot, duration, booking)
 
@@ -254,8 +263,7 @@ class Scheduler:
                             total_duration = self._get_total_duration_with_break(semester, start_slot, duration)
                             if (start_slot + total_duration) > utils.TOTAL_SLOTS_PER_DAY:
                                 continue
-                            
-                            # Check master room, section, and master faculty schedules
+
                             if (room_tt.is_slot_free(day, start_slot, duration) and
                                 all(s.timetable.is_slot_free(day, start_slot, total_duration) for s in sections_to_schedule) and
                                 self._check_faculty_availability(course.instructors, day, start_slot, duration)):
@@ -274,52 +282,20 @@ class Scheduler:
                         print(f"  Failed: {course.course_code} (Combined {session_type})")
                         self.failed_courses.append((course, f"All Sections - No common C004 slot for {session_type}"))
 
-    def _find_common_slot_for_basket(self, sections: List[Section], course: Course, 
-                                     session_type: str, duration: int) -> Optional[Tuple[int, int]]:
-        
-        if not sections: return None
-        semester = sections[0].semester
-        
-        avg_day_load = [0] * len(utils.DAYS)
-        for day in range(len(utils.DAYS)):
-            for section in sections:
-                avg_day_load[day] += section.timetable.day_load_tracker[day]
-        sorted_days = sorted(range(len(utils.DAYS)), key=lambda d: avg_day_load[d])
-
-        for day in sorted_days:
-            
-            daily_limit_violation = any(
-                s.timetable.check_daily_limit_violation(day, course.course_code, session_type)
-                for s in sections
-            )
-            if daily_limit_violation:
-                continue
-
-            for start_slot in range(utils.TOTAL_SLOTS_PER_DAY - duration + 1):
-                
-                total_duration = self._get_total_duration_with_break(semester, start_slot, duration)
-                if (start_slot + total_duration) > utils.TOTAL_SLOTS_PER_DAY:
-                    continue
-                
-                sections_free = all(
-                    s.timetable.is_slot_free(day, start_slot, total_duration) for s in sections
-                )
-                if not sections_free:
-                    continue
-
-                return (day, start_slot)
-                
-        return None
-
     def _schedule_phase_baskets(self, sections_by_dept: Dict[str, List[Section]], courses: List[Course]):
-        print("  Running Phase 2: Baskets & Electives (is_pseudo_basket=true)")
+        print("  Running Phase 2: Baskets & Electives (is_pseudo_course=true)")
         
         for course in courses:
-            if not course.is_pseudo_basket:
+            if not course.is_pseudo_course:
                 continue
             
-            all_semester_sections = sections_by_dept.get("ALL_DEPTS", [])
-            sections_to_schedule = [s for s in all_semester_sections if s.semester == course.semester]
+            sections_to_schedule = []
+            if course.department == "ALL_DEPTS":
+                all_semester_sections = sections_by_dept.get("ALL_DEPTS", [])
+                sections_to_schedule = [s for s in all_semester_sections if s.semester == course.semester]
+            else:
+                sections_to_schedule = sections_by_dept.get(course.department, [])
+
             
             unique_sections = []
             seen_ids = set()
@@ -342,15 +318,14 @@ class Scheduler:
                     if not slot:
                         print(f"  Failed: {course.course_name} (No common slot)")
                         self.failed_courses.append((course, "No common slot"))
-                        if course.pre_post_preference == "OVERFLOW" and self.run_period == "PRE":
+                        if course.pre_post_preference == "overflow" and self.run_period == "PRE":
                             print(f"    -> Adding {course.course_code} to POST overflow list.")
                             self.overflow_electives.append(course)
                         continue
                     
                     day, start_slot = slot
                     
-                    # --- THIS IS THE FIX for FATAL error ---
-                    # Find and book rooms sequentially to prevent double-booking
+                    # --- FIX for Double Booking ---
                     rooms_booked_for_this_slot: List[Classroom] = []
                     failed_to_find_room = False
                     
@@ -362,7 +337,6 @@ class Scheduler:
                                 course=course, session_type=session_type.capitalize(),
                                 section_id=section.id, instructors=course.instructors, room_ids=[]
                             )
-                            # Book this section, faculty, and room
                             self._book_session([section], class_info, day, start_slot, duration, [room])
                             rooms_booked_for_this_slot.append(room)
                         else:
@@ -370,36 +344,36 @@ class Scheduler:
                             self.failed_courses.append((course, f"Basket - No room for {section.id}"))
                             failed_to_find_room = True
                             
-                            # Rollback: Un-book all previously booked rooms/faculty for this slot
+                            # Rollback
+                            for s_rb in sections_to_schedule: # Rollback for all sections
+                                s_rb.timetable.grid[day][start_slot:start_slot+duration] = [None] * duration
                             for r in rooms_booked_for_this_slot:
-                                # This is a simple rollback. A real system would be more complex.
                                 room_tt = self._get_or_create_room_schedule(r.room_id)
-                                for i in range(duration):
-                                    room_tt.grid[day][start_slot+i] = None
+                                room_tt.grid[day][start_slot:start_slot+duration] = [None] * duration
                             break
                     
                     if failed_to_find_room:
-                        if course.pre_post_preference == "OVERFLOW" and self.run_period == "PRE":
+                        if course.pre_post_preference == "overflow" and self.run_period == "PRE":
                             print(f"    -> Adding {course.course_code} to POST overflow list.")
                             self.overflow_electives.append(course)
-                    # --- END OF FIX ---
+                    # --- END FIX ---
 
 
     def _schedule_phase_core_courses(self, sections_by_dept: Dict[str, List[Section]], courses: List[Course]):
-        print("  Running Phase 3: Core Courses (is_combined=no)")
+        print("  Running Phase 3: Core Courses (is_combined=no, is_pseudo_course=no)")
         sorted_courses = sorted(courses, key=lambda c: (c.P == 0, c.L == 0))
         
-        for course in sorted_courses:
-            if course.is_combined or course.is_pseudo_basket:
+        for course in courses:
+            if course.is_combined or course.is_pseudo_course:
                 continue
 
             sections_to_schedule = []
-            if course.pre_post_preference.lower() == "pre/post":
+            if course.pre_post_preference.lower() == "split":
                 if self.run_period == "PRE":
                     sections_to_schedule = [s for s in sections_by_dept.get(course.department, []) if s.section_name == "A"]
                 elif self.run_period == "POST":
                     sections_to_schedule = [s for s in sections_by_dept.get(course.department, []) if s.section_name == "B"]
-            elif course.pre_post_preference.lower() in ["full", "pre", "post"]:
+            elif course.pre_post_preference.lower() in ["full", "pre", "post", "overflow"]:
                 sections_to_schedule = sections_by_dept.get(course.department, [])
             
             if not sections_to_schedule:
@@ -432,8 +406,8 @@ class Scheduler:
                     session_instructors = instructors_for_this_section
                     lab_capacity = student_count
                     
-                    # --- THIS IS THE FIX for LTPSC Mismatch ---
-                    # We no longer multiply count. P=2 means 1 session.
+                    # --- FIX for LTPSC Mismatch ---
+                    # We no longer multiply count. P=2 (count=1) schedules 1 lab.
                     
                     if session_type.lower() == "practical" and course.department == "CSE":
                         lab_capacity = 40 # Assume lab benches/capacity is ~40
@@ -442,13 +416,16 @@ class Scheduler:
                             session_instructors = [course.instructors[2]]
                         elif len(course.instructors) == 2:
                              session_instructors = instructors_for_this_section
-                    # --- END OF FIX ---
+                    # --- END FIX ---
 
                     for i in range(count):
                         slot = self._find_common_slot([section], course, session_type, duration, session_instructors)
                         if not slot:
                             print(f"  Failed: {course.course_code} ({session_type} {i+1} for {section.id} - No slot)")
                             self.failed_courses.append((course, f"{session_type} for {section.id} - No slot"))
+                            if course.pre_post_preference == "overflow" and self.run_period == "PRE":
+                                print(f"    -> Adding {course.course_code} to POST overflow list.")
+                                self.overflow_electives.append(course)
                             continue
                         
                         day, start_slot = slot
@@ -470,6 +447,9 @@ class Scheduler:
                         else:
                             print(f"  Failed: {course.course_code} ({session_type} {i+1} for {section.id} - No room)")
                             self.failed_courses.append((course, f"{session_type} for {section.id} - No room"))
+                            if course.pre_post_preference == "overflow" and self.run_period == "PRE":
+                                print(f"    -> Adding {course.course_code} to POST overflow list.")
+                                self.overflow_electives.append(course)
 
 
     def run(self, courses: List[Course], sections: List[Section]) -> Tuple[List[Section], List[Course]]:
@@ -477,12 +457,11 @@ class Scheduler:
         sections_by_dept: Dict[str, List[Section]] = {}
         for s in sections:
             sections_by_dept.setdefault(s.department, []).append(s)
-            
             sections_by_dept.setdefault("ALL_DEPTS", []).append(s)
         
-        basket_courses = [c for c in courses if c.is_pseudo_basket]
+        basket_courses = [c for c in courses if c.is_pseudo_course]
         combined_courses = [c for c in courses if c.is_combined]
-        core_courses = [c for c in courses if not c.is_combined and not c.is_pseudo_basket]
+        core_courses = [c for c in courses if not c.is_combined and not c.is_pseudo_course]
         
         self._schedule_phase_combined(sections_by_dept, combined_courses)
         self._schedule_phase_baskets(sections_by_dept, basket_courses)

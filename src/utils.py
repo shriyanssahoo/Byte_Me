@@ -21,8 +21,8 @@ END_TIME: time = time.fromisoformat(END_TIME_STR)
 TOTAL_DAY_MINUTES: int = (END_TIME.hour - START_TIME.hour) * 60
 TOTAL_SLOTS_PER_DAY: int = TOTAL_DAY_MINUTES // SLOT_DURATION_MINS # 54 slots (0-53)
 
-# --- NEW CONFIGURABLE BREAK TIME ---
-CLASS_BREAK_MINS: int = 10  # <--- CHANGE THIS VALUE TO 20, 30, etc.
+# --- Configurable Break Time ---
+CLASS_BREAK_MINS: int = 10
 
 # --- Scheduling Logic Constants ---
 LECTURE_SLOTS: int = 90 // SLOT_DURATION_MINS         # 9 slots

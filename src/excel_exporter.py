@@ -79,11 +79,15 @@ class ExcelExporter:
         instructor_str = ", ".join(s_class.instructors)
         session_str = f"({s_class.session_type})"
         
-        # Hide TBD instructors and session type for pseudo-baskets
-        if s_class.course.is_pseudo_basket:
-            instructor_str = ""
-            session_str = "(Elective)"
-            
+        if s_class.course.is_pseudo_course:
+            instructor_str = "" # Hide TBD
+            # Extract (A) from "Elective (A)"
+            match = re.search(r'\((.*?)\)', course_name)
+            if match:
+                session_str = f"({match.group(1)})" # Shows "(A)" or "(B)"
+            else:
+                session_str = "(Elective/Basket)"
+        
         if view_type == 'section':
             return f"{course_name}\n{session_str}\n{instructor_str}\n{room_str}".strip()
         elif view_type == 'faculty':

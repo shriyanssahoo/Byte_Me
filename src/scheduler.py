@@ -1,6 +1,6 @@
 """
 src/scheduler.py
-(Rebuilt to fix Phase 2 double-booking and Phase 3 LTPSC mismatch for CSE labs)
+(FIXED the Pylance reportArgumentType error in Phase 8)
 """
 
 from typing import List, Dict, Optional, Tuple, Set
@@ -10,10 +10,6 @@ import copy
 import random 
 
 class Scheduler:
-    """
-    The main scheduling engine.
-    """
-    
     def __init__(self, 
                  classrooms: List[Classroom], 
                  run_period: str,
@@ -25,33 +21,24 @@ class Scheduler:
         
         self.all_classrooms = classrooms
         self.room_lookup = {r.room_id: r for r in classrooms} 
-        self.c004_room: Optional[Classroom] = None
-        self.large_classrooms: List[Classroom] = []
-        self.small_classrooms: List[Classroom] = []
+        self.c004_room = None
+        self.general_classrooms: List[Classroom] = []
         self.labs: List[Classroom] = []
         
-        LARGE_ROOM_THRESHOLD = 100 
-
         for r in classrooms:
             if r.room_id == "C004":
                 self.c004_room = r
             elif r.room_type == "CLASSROOM":
-                if r.capacity > LARGE_ROOM_THRESHOLD:
-                    self.large_classrooms.append(r)
-                else:
-                    self.small_classrooms.append(r)
+                self.general_classrooms.append(r)
             elif r.room_type == "LAB":
                 self.labs.append(r)
-                
-        self.large_classrooms.sort(key=lambda r: r.capacity)
-        self.small_classrooms.sort(key=lambda r: r.capacity)
-        self.labs.sort(key=lambda r: r.capacity)
         
         self.faculty_schedules = master_faculty_schedules
         self.room_schedules = master_room_schedules
         
         self.failed_courses: List[Tuple[Course, str]] = []
-        self.overflow_electives: List[Course] = []
+    
+    # --- UTILITY FUNCTIONS ---
 
     def _get_or_create_faculty_schedule(self, faculty_name: str) -> Timetable:
         if faculty_name not in self.faculty_schedules:
@@ -59,19 +46,16 @@ class Scheduler:
         return self.faculty_schedules[faculty_name]
 
     def _get_or_create_room_schedule(self, room_id: str) -> Timetable:
-        if room_id not in self.room_schedules:
-            if room_id not in self.room_lookup:
-                raise ValueError(f"Attempted to schedule in non-existent room: {room_id}")
-            self.room_schedules[room_id] = Timetable(owner_id=room_id, semester=-1)
+        if room_id not in self.room_lookup:
+            raise ValueError(f"Attempted to schedule in non-existent room: {room_id}")
+        self.room_schedules[room_id] = Timetable(owner_id=room_id, semester=-1)
         return self.room_schedules[room_id]
 
     def _get_total_duration_with_break(self, semester: int, start_slot: int, class_duration: int) -> int:
         class_end_slot = start_slot + class_duration
         lunch_start, _ = utils.get_lunch_slots(semester)
-        
         is_end_of_day = (class_end_slot == utils.TOTAL_SLOTS_PER_DAY)
         is_before_lunch = (class_end_slot == lunch_start)
-        
         if is_end_of_day or is_before_lunch:
             return class_duration
         else:
@@ -82,10 +66,8 @@ class Scheduler:
             if instructor == "TBD":
                 continue
             faculty_tt = self._get_or_create_faculty_schedule(instructor)
-            
             check_start = start_slot - utils.FACULTY_BREAK_SLOTS
             check_end = start_slot + duration + utils.FACULTY_BREAK_SLOTS
-            
             for slot in range(check_start, check_end):
                 if 0 <= slot < utils.TOTAL_SLOTS_PER_DAY:
                     if not faculty_tt.is_slot_free(day, slot, 1):
@@ -94,77 +76,30 @@ class Scheduler:
 
     def _find_available_room(self, day: int, start_slot: int, duration: int, 
                              room_type: str, capacity: int) -> Optional[Classroom]:
-        
-        room_pool: List[Classroom] = []
-        fallback_pool: List[Classroom] = []
-
         if room_type == "LAB":
             room_pool = self.labs
         else:
-            if capacity > 100:
-                room_pool = self.large_classrooms
-                fallback_pool = self.small_classrooms
-            else:
-                room_pool = self.small_classrooms
-                fallback_pool = self.large_classrooms
-        
-        for room in room_pool:
-            if room.capacity >= capacity:
-                room_tt = self._get_or_create_room_schedule(room.room_id)
-                if room_tt.is_slot_free(day, start_slot, duration):
-                    return room
-        
-        for room in fallback_pool:
-            if room.capacity >= capacity:
-                room_tt = self._get_or_create_room_schedule(room.room_id)
-                if room_tt.is_slot_free(day, start_slot, duration):
-                    print(f"  Warning: Using fallback pool. Scheduled {capacity} students in room {room.room_id} ({room.capacity})")
-                    return room
-
+            room_pool = self.general_classrooms
+        eligible_rooms = [r for r in room_pool if r.capacity >= capacity]
+        sorted_rooms = sorted(eligible_rooms, key=lambda r: r.capacity)
+        for room in sorted_rooms:
+            room_tt = self._get_or_create_room_schedule(room.room_id)
+            if room_tt.is_slot_free(day, start_slot, duration):
+                return room
         return None
     
-    def _find_adjacent_labs(self, day: int, start_slot: int, duration: int, 
-                            capacity: int) -> Optional[List[Classroom]]:
-        labs = sorted(
-            self.labs,
-            key=lambda r: (r.floor, utils.get_room_number_from_id(r.room_id))
-        )
-        
-        for i in range(len(labs) - 1):
-            lab1 = labs[i]
-            lab2 = labs[i+1]
-            
-            if (lab1.floor != lab2.floor or
-                utils.get_room_number_from_id(lab2.room_id) != utils.get_room_number_from_id(lab1.room_id) + 1):
-                continue
-                
-            if (lab1.capacity + lab2.capacity) * 1.25 < capacity:
-                continue
-                
-            lab1_tt = self._get_or_create_room_schedule(lab1.room_id)
-            lab2_tt = self._get_or_create_room_schedule(lab2.room_id)
-            
-            if (lab1_tt.is_slot_free(day, start_slot, duration) and
-                lab2_tt.is_slot_free(day, start_slot, duration)):
-                return [lab1, lab2]
-                
-        return None
-
     def _find_common_slot(self, sections: List[Section], course: Course,
-                         session_type: str, duration: int, 
-                         instructors: List[str]) -> Optional[Tuple[int, int]]:
+                          session_type: str, duration: int, # session_type is now always lowercase
+                          instructors: List[str]) -> Optional[Tuple[int, int]]:
         if not sections: return None
         semester = sections[0].semester
-        
         avg_day_load = [0] * len(utils.DAYS)
         for day in range(len(utils.DAYS)):
             for section in sections:
                 avg_day_load[day] += section.timetable.day_load_tracker[day]
-        
         sorted_days = sorted(range(len(utils.DAYS)), key=lambda d: avg_day_load[d])
 
         for day in sorted_days:
-            
             daily_limit_violation = any(
                 s.timetable.check_daily_limit_violation(day, course.course_code, session_type) 
                 for s in sections
@@ -173,29 +108,23 @@ class Scheduler:
                 continue
 
             for start_slot in range(utils.TOTAL_SLOTS_PER_DAY - duration + 1):
-                
                 total_duration = self._get_total_duration_with_break(semester, start_slot, duration)
                 if (start_slot + total_duration) > utils.TOTAL_SLOTS_PER_DAY:
                     continue
-
                 sections_free = all(
                     s.timetable.is_slot_free(day, start_slot, total_duration) for s in sections
                 )
                 if not sections_free:
                     continue
-
                 faculty_free = self._check_faculty_availability(instructors, day, start_slot, duration)
                 if not faculty_free:
                     continue
-                    
                 return (day, start_slot)
-                
         return None
 
     def _book_session(self, sections: List[Section], class_info_template: ScheduledClass, 
                       day: int, start_slot: int, duration: int, rooms: List[Classroom]):
         room_ids = [r.room_id for r in rooms]
-        
         booking = copy.deepcopy(class_info_template)
         booking.room_ids = room_ids
         
@@ -214,89 +143,72 @@ class Scheduler:
             room_tt = self._get_or_create_room_schedule(room.room_id)
             room_tt.book_slot(day, start_slot, duration, booking)
 
+    # --- SCHEDULING PHASES ---
+
     def _schedule_phase_combined(self, sections_by_dept: Dict[str, List[Section]], courses: List[Course]):
-        print("  Running Phase 1: Combined Classes (is_combined=yes)")
+        print("  Running Phase 4: Combined Classes (is_combined=yes)")
         for course in courses:
             if not course.is_combined:
                 continue
-
-            sections_to_schedule = sections_by_dept.get(course.department, [])
-            
+            all_dept_sections = sections_by_dept.get(course.department, [])
+            sections_to_schedule = [s for s in all_dept_sections if s.semester == course.semester]
             if not sections_to_schedule:
                 continue
-
             room = self.c004_room
             if not room:
+                print(f"    Failed: {course.course_code} - C004 (240-seater) room not found in data.")
                 self.failed_courses.append((course, "All Sections - C004 missing"))
                 continue
-            
             if room.capacity < course.registered_students:
+                 print(f"    Failed: {course.course_code} - C004 is too small for {course.registered_students} students.")
                  self.failed_courses.append((course, f"C004 is too small for {course.registered_students} students"))
                  continue
             
             semester = sections_to_schedule[0].semester
             sessions = course.get_required_sessions()
             
-            for session_type, count in sessions.items():
+            for session_type, count in sessions.items(): # session_type is 'lecture', 'practical'
                 if count == 0: continue
                 duration = course.get_session_duration(session_type)
                 
                 for _ in range(count):
                     room_tt = self._get_or_create_room_schedule(room.room_id)
-                    slot = None
+                    slot = self._find_common_slot(sections_to_schedule, course, session_type, duration, course.instructors)
                     
-                    avg_day_load = [0] * len(utils.DAYS)
-                    for day_idx in range(len(utils.DAYS)):
-                        for s in sections_to_schedule:
-                            avg_day_load[day_idx] += s.timetable.day_load_tracker[day_idx]
-                    sorted_days = sorted(range(len(utils.DAYS)), key=lambda d: avg_day_load[d])
-
-                    for day in sorted_days:
-                        daily_limit_violation = any(
-                            s.timetable.check_daily_limit_violation(day, course.course_code, session_type)
-                            for s in sections_to_schedule
-                        )
-                        if daily_limit_violation:
-                            continue
-
-                        for start_slot in range(utils.TOTAL_SLOTS_PER_DAY - duration + 1):
-                            total_duration = self._get_total_duration_with_break(semester, start_slot, duration)
-                            if (start_slot + total_duration) > utils.TOTAL_SLOTS_PER_DAY:
-                                continue
-
-                            if (room_tt.is_slot_free(day, start_slot, duration) and
-                                all(s.timetable.is_slot_free(day, start_slot, total_duration) for s in sections_to_schedule) and
-                                self._check_faculty_availability(course.instructors, day, start_slot, duration)):
-                                slot = (day, start_slot)
-                                break
-                        if slot: break
+                    if slot:
+                        day, start_slot = slot
+                        if not room_tt.is_slot_free(day, start_slot, duration):
+                            slot = None 
                     
                     if slot:
                         day, start_slot = slot
                         class_info = ScheduledClass(
-                            course=course, session_type=session_type.capitalize(),
-                            section_id="COMBINED", instructors=course.instructors, room_ids=[]
+                            course=course, 
+                            session_type=session_type, # Pass lowercase
+                            section_id="COMBINED", 
+                            instructors=course.instructors, 
+                            room_ids=[]
                         )
                         self._book_session(sections_to_schedule, class_info, day, start_slot, duration, [room])
                     else:
-                        print(f"  Failed: {course.course_code} (Combined {session_type})")
+                        print(f"    Failed: {course.course_code} (Combined {session_type})")
                         self.failed_courses.append((course, f"All Sections - No common C004 slot for {session_type}"))
 
     def _schedule_phase_baskets(self, sections_by_dept: Dict[str, List[Section]], courses: List[Course]):
-        print("  Running Phase 2: Baskets & Electives (is_pseudo_course=true)")
+        print("  Running Phase 3: Elective/Basket Slots (is_pseudo_basket=true)")
         
-        for course in courses:
-            if not course.is_pseudo_course:
+        for pseudo_course in courses:
+            if not pseudo_course.is_pseudo_basket:
                 continue
             
             sections_to_schedule = []
-            if course.department == "ALL_DEPTS":
+            if pseudo_course.department == "ALL_DEPTS":
                 all_semester_sections = sections_by_dept.get("ALL_DEPTS", [])
-                sections_to_schedule = [s for s in all_semester_sections if s.semester == course.semester]
+                sections_to_schedule = [s for s in all_semester_sections if s.semester == pseudo_course.semester]
             else:
-                sections_to_schedule = sections_by_dept.get(course.department, [])
+                all_dept_sections = sections_by_dept.get(pseudo_course.department, [])
+                sections_to_schedule = [s for s in all_dept_sections if s.semester == pseudo_course.semester]
 
-            
             unique_sections = []
             seen_ids = set()
             for s in sections_to_schedule:
@@ -308,73 +220,45 @@ class Scheduler:
             if not sections_to_schedule:
                 continue
             
-            sessions = course.get_required_sessions()
-            for session_type, count in sessions.items():
+            sessions = pseudo_course.get_required_sessions()
+            for session_type, count in sessions.items(): # session_type is 'lecture', etc
                 if count == 0: continue
-                duration = course.get_session_duration(session_type)
+                duration = pseudo_course.get_session_duration(session_type)
                 
                 for _ in range(count):
-                    slot = self._find_common_slot(sections_to_schedule, course, session_type, duration, course.instructors)
-                    if not slot:
-                        print(f"  Failed: {course.course_name} (No common slot)")
-                        self.failed_courses.append((course, "No common slot"))
-                        if course.pre_post_preference == "overflow" and self.run_period == "PRE":
-                            print(f"    -> Adding {course.course_code} to POST overflow list.")
-                            self.overflow_electives.append(course)
-                        continue
+                    slot = self._find_common_slot(sections_to_schedule, pseudo_course, session_type, duration, ["TBD"])
                     
-                    day, start_slot = slot
-                    
-                    # --- FIX for Double Booking ---
-                    rooms_booked_for_this_slot: List[Classroom] = []
-                    failed_to_find_room = False
-                    
-                    for section in sections_to_schedule:
-                        room = self._find_available_room(day, start_slot, duration, "CLASSROOM", 100) # 100=avg
-                        
-                        if room:
-                            class_info = ScheduledClass(
-                                course=course, session_type=session_type.capitalize(),
-                                section_id=section.id, instructors=course.instructors, room_ids=[]
-                            )
-                            self._book_session([section], class_info, day, start_slot, duration, [room])
-                            rooms_booked_for_this_slot.append(room)
-                        else:
-                            print(f"  Failed: {course.course_name} (No room for {section.id} at {utils.DAYS[day]} {utils.slot_index_to_time_str(start_slot)})")
-                            self.failed_courses.append((course, f"Basket - No room for {section.id}"))
-                            failed_to_find_room = True
-                            
-                            # Rollback
-                            for s_rb in sections_to_schedule: # Rollback for all sections
-                                s_rb.timetable.grid[day][start_slot:start_slot+duration] = [None] * duration
-                            for r in rooms_booked_for_this_slot:
-                                room_tt = self._get_or_create_room_schedule(r.room_id)
-                                room_tt.grid[day][start_slot:start_slot+duration] = [None] * duration
-                            break
-                    
-                    if failed_to_find_room:
-                        if course.pre_post_preference == "overflow" and self.run_period == "PRE":
-                            print(f"    -> Adding {course.course_code} to POST overflow list.")
-                            self.overflow_electives.append(course)
-                    # --- END FIX ---
-
+                    if slot:
+                        day, start_slot = slot
+                        class_info = ScheduledClass(
+                            course=pseudo_course, 
+                            session_type=session_type, # Pass lowercase
+                            section_id="BASKET_SLOT",
+                            instructors=["TBD"], 
+                            room_ids=["TBD"]
+                        )
+                        self._book_session(sections_to_schedule, class_info, day, start_slot, duration, [])
+                    else:
+                        print(f"    Failed: {pseudo_course.course_name} (No common slot for students)")
+                        self.failed_courses.append((pseudo_course, "No common slot for all sections"))
 
     def _schedule_phase_core_courses(self, sections_by_dept: Dict[str, List[Section]], courses: List[Course]):
-        print("  Running Phase 3: Core Courses (is_combined=no, is_pseudo_course=no)")
+        print("  Running Phase 5/6: Core Courses (is_combined=no)")
         sorted_courses = sorted(courses, key=lambda c: (c.P == 0, c.L == 0))
         
-        for course in courses:
-            if course.is_combined or course.is_pseudo_course:
+        for course in sorted_courses:
+            if course.is_combined or course.is_pseudo_basket:
                 continue
-
             sections_to_schedule = []
+            all_dept_sections = sections_by_dept.get(course.department, [])
+            
             if course.pre_post_preference.lower() == "split":
                 if self.run_period == "PRE":
-                    sections_to_schedule = [s for s in sections_by_dept.get(course.department, []) if s.section_name == "A"]
+                    sections_to_schedule = [s for s in all_dept_sections if s.semester == course.semester and s.section_name == "A"]
                 elif self.run_period == "POST":
-                    sections_to_schedule = [s for s in sections_by_dept.get(course.department, []) if s.section_name == "B"]
-            elif course.pre_post_preference.lower() in ["full", "pre", "post", "overflow"]:
-                sections_to_schedule = sections_by_dept.get(course.department, [])
+                    sections_to_schedule = [s for s in all_dept_sections if s.semester == course.semester and s.section_name == "B"]
+            else:
+                sections_to_schedule = [s for s in all_dept_sections if s.semester == course.semester]
             
             if not sections_to_schedule:
                 continue
@@ -382,16 +266,14 @@ class Scheduler:
             for section in sections_to_schedule:
                 sessions = course.get_required_sessions()
                 session_map = [
-                    ("Practical", sessions["practical"], utils.PRACTICAL_SLOTS),
-                    ("Lecture", sessions["lecture"], utils.LECTURE_SLOTS),
-                    ("Tutorial", sessions["tutorial"], utils.TUTORIAL_SLOTS)
+                    ("practical", sessions["practical"], utils.PRACTICAL_SLOTS, "LAB"),
+                    ("lecture", sessions["lecture"], utils.LECTURE_SLOTS, "CLASSROOM"),
+                    ("tutorial", sessions["tutorial"], utils.TUTORIAL_SLOTS, "CLASSROOM")
                 ]
                 
-                student_count = 100
-                if course.department == "CSE":
-                    student_count = course.registered_students // 2
-                else:
-                    student_count = course.registered_students
+                student_count = 85
+                if course.department != "CSE":
+                     student_count = course.registered_students
                 
                 instructors_for_this_section = course.instructors
                 if course.department == "CSE" and len(course.instructors) > 1:
@@ -400,57 +282,144 @@ class Scheduler:
                     elif section.section_name == 'B':
                         instructors_for_this_section = [course.instructors[1]]
 
-                for session_type, count, duration in session_map:
+                for session_type, count, duration, room_type in session_map: # session_type is 'practical', etc
                     if count == 0: continue
                     
                     session_instructors = instructors_for_this_section
-                    lab_capacity = student_count
+                    session_capacity = student_count
                     
-                    # --- FIX for LTPSC Mismatch ---
-                    # We no longer multiply count. P=2 (count=1) schedules 1 lab.
-                    
-                    if session_type.lower() == "practical" and course.department == "CSE":
-                        lab_capacity = 40 # Assume lab benches/capacity is ~40
-                        
+                    if session_type == "practical" and course.department == "CSE":
+                        session_capacity = 40 
                         if len(course.instructors) > 2:
                             session_instructors = [course.instructors[2]]
                         elif len(course.instructors) == 2:
                              session_instructors = instructors_for_this_section
-                    # --- END FIX ---
-
+                    
                     for i in range(count):
                         slot = self._find_common_slot([section], course, session_type, duration, session_instructors)
                         if not slot:
-                            print(f"  Failed: {course.course_code} ({session_type} {i+1} for {section.id} - No slot)")
+                            print(f"    Failed: {course.course_code} ({session_type} {i+1} for {section.id} - No slot)")
                             self.failed_courses.append((course, f"{session_type} for {section.id} - No slot"))
-                            if course.pre_post_preference == "overflow" and self.run_period == "PRE":
-                                print(f"    -> Adding {course.course_code} to POST overflow list.")
-                                self.overflow_electives.append(course)
                             continue
                         
                         day, start_slot = slot
+                        room = self._find_available_room(day, start_slot, duration, room_type, session_capacity)
                         
-                        rooms = None
-                        if session_type.lower() == "practical":
-                            room = self._find_available_room(day, start_slot, duration, "LAB", lab_capacity)
-                            rooms = [room] if room else None
-                        else:
-                            room = self._find_available_room(day, start_slot, duration, "CLASSROOM", student_count)
-                            rooms = [room] if room else None
-                        
-                        if rooms:
+                        if room:
                             class_info = ScheduledClass(
-                                course=course, session_type=session_type.capitalize(),
-                                section_id=section.id, instructors=session_instructors, room_ids=[]
+                                course=course, 
+                                session_type=session_type, # Pass lowercase
+                                section_id=section.id, 
+                                instructors=session_instructors, 
+                                room_ids=[]
                             )
-                            self._book_session([section], class_info, day, start_slot, duration, rooms)
+                            self._book_session([section], class_info, day, start_slot, duration, [room])
                         else:
-                            print(f"  Failed: {course.course_code} ({session_type} {i+1} for {section.id} - No room)")
+                            print(f"    Failed: {course.course_code} ({session_type} {i+1} for {section.id} - No room)")
                             self.failed_courses.append((course, f"{session_type} for {section.id} - No room"))
-                            if course.pre_post_preference == "overflow" and self.run_period == "PRE":
-                                print(f"    -> Adding {course.course_code} to POST overflow list.")
-                                self.overflow_electives.append(course)
+    
+    # --- PHASE 8 FUNCTIONS (with all fixes) ---
+    
+    def _find_unique_placeholders(self, sections: List[Section]) -> Dict[Tuple[str, int, int, str], Course]:
+        placeholder_map: Dict[Tuple[str, int, int, str], Course] = {}
+        for section in sections:
+            for day in range(len(utils.DAYS)):
+                for slot in range(utils.TOTAL_SLOTS_PER_DAY):
+                    s_class = section.timetable.grid[day][slot]
+                    if not s_class:
+                        continue
+                    is_start = (slot == 0) or (section.timetable.grid[day][slot-1] != s_class)
+                    if is_start and s_class.course.is_pseudo_basket:
+                        key = (s_class.course.course_code, day, slot, s_class.session_type.lower())
+                        if key not in placeholder_map:
+                            placeholder_map[key] = s_class.course
+        return placeholder_map
 
+    def _update_placeholders_in_sections(self, sections: List[Section], 
+                                          day: int, start_slot: int, duration: int, 
+                                          actual_class_info: ScheduledClass,
+                                          pseudo_course: Course): # <-- EXPECTS Course OBJECT
+        
+        pseudo_course_code = pseudo_course.course_code
+
+        for section in sections:
+            s_class_at_slot = section.timetable.grid[day][start_slot]
+            if not s_class_at_slot:
+                continue
+            
+            if s_class_at_slot.course.course_code == pseudo_course_code:
+                
+                is_type_1_elective = (pseudo_course.department == "ALL_DEPTS")
+                is_matching_dept = (actual_class_info.course.department == section.department)
+
+                if is_type_1_elective or is_matching_dept:
+                    # FIX for cross-pollination: only update if depts match
+                    if is_matching_dept: 
+                        final_class_info = copy.copy(actual_class_info)
+                        final_class_info.section_id = section.id
+                        for i in range(duration):
+                            if start_slot + i < utils.TOTAL_SLOTS_PER_DAY:
+                                section.timetable.grid[day][start_slot + i] = final_class_info
+
+    def _schedule_phase_assign_electives(self, sections: List[Section]) -> List[Course]:
+        print("  Running Phase 8: Assigning Electives to Rooms/Faculty")
+        overflow_courses_to_post: List[Course] = []
+        
+        placeholder_map = self._find_unique_placeholders(sections)
+        
+        if not placeholder_map:
+            print("    No elective slots were booked. Skipping.")
+            return []
+            
+        for (pseudo_code, day, start_slot, session_type), pseudo_course in placeholder_map.items():
+            print(f"    Assigning slot: {pseudo_course.course_name} ({session_type}) at {utils.DAYS[day]} {utils.slot_index_to_time_str(start_slot)}")
+            
+            duration = pseudo_course.get_session_duration(session_type)
+            room_type = "lab" if session_type == "practical" else "classroom"
+            
+            sections_for_this_slot = [s for s in sections if s.semester == pseudo_course.semester]
+            
+            for actual_course in pseudo_course.bundled_courses:
+                instructors = actual_course.instructors
+                students = actual_course.registered_students
+                
+                faculty_free = self._check_faculty_availability(instructors, day, start_slot, duration)
+                room = self._find_available_room(day, start_slot, duration, room_type, students)
+                
+                if faculty_free and room:
+                    print(f"      -> SUCCESS: Booked {actual_course.course_code} in {room.room_id}")
+                    class_info = ScheduledClass(
+                        course=actual_course,
+                        session_type=session_type, # Pass lowercase
+                        section_id=actual_course.department,
+                        instructors=instructors,
+                        room_ids=[room.room_id]
+                    )
+                    self._book_session([], class_info, day, start_slot, duration, [room])
+                    
+                    # --- THIS IS THE FIX ---
+                    # Pass the full pseudo_course OBJECT, not its code
+                    self._update_placeholders_in_sections(
+                        sections_for_this_slot, day, start_slot, duration, 
+                        class_info, pseudo_course 
+                    )
+                    # --- END OF FIX ---
+
+                else:
+                    reason = "no room" if not room else "faculty conflict"
+                    print(f"      -> FAILED: {actual_course.course_code} ({reason})")
+                    if pseudo_course.pre_post_preference == "OVERFLOW" and self.run_period == "PRE":
+                        overflow_courses_to_post.append(actual_course)
+                    else:
+                        self.failed_courses.append((actual_course, f"No {reason} in scheduled elective slot"))
+
+        unique_overflow_courses = []
+        seen_codes = set()
+        for course in overflow_courses_to_post:
+            if course.course_code not in seen_codes:
+                unique_overflow_courses.append(course)
+                seen_codes.add(course.course_code)
+        return unique_overflow_courses
 
     def run(self, courses: List[Course], sections: List[Section]) -> Tuple[List[Section], List[Course]]:
         
@@ -459,25 +428,24 @@ class Scheduler:
             sections_by_dept.setdefault(s.department, []).append(s)
             sections_by_dept.setdefault("ALL_DEPTS", []).append(s)
         
-        basket_courses = [c for c in courses if c.is_pseudo_course]
+        basket_courses = [c for c in courses if c.is_pseudo_basket]
         combined_courses = [c for c in courses if c.is_combined]
-        core_courses = [c for c in courses if not c.is_combined and not c.is_pseudo_course]
+        core_courses = [c for c in courses if not c.is_combined and not c.is_pseudo_basket]
         
-        self._schedule_phase_combined(sections_by_dept, combined_courses)
-        self._schedule_phase_baskets(sections_by_dept, basket_courses)
-        self._schedule_phase_core_courses(sections_by_dept, core_courses)
+        self._schedule_phase_combined(sections_by_dept, combined_courses) # Phase 4
+        self._schedule_phase_baskets(sections_by_dept, basket_courses)    # Phase 3
+        self._schedule_phase_core_courses(sections_by_dept, core_courses)  # Phase 5 & 6
         
-        print(f"--- {self.run_period} RUN COMPLETE ---")
+        overflow_courses = self._schedule_phase_assign_electives(sections) # Phase 8
+        
+        if sections:
+             print(f"--- {self.run_period} RUN COMPLETE (Sem {sections[0].semester}) ---")
+        else:
+             print(f"--- {self.run_period} RUN COMPLETE (No sections) ---")
+             
         if self.failed_courses:
             print(f"  Warning: {len(self.failed_courses)} courses/sessions failed permanently in this run.")
-        if self.overflow_electives:
-            print(f"  Info: {len(set(c.course_code for c in self.overflow_electives))} electives failed room allocation and will overflow to POST.")
+        if overflow_courses:
+            print(f"  Info: {len(overflow_courses)} electives failed room/faculty and will overflow to POST.")
             
-        unique_overflow_codes = set()
-        unique_overflow_list = []
-        for course in self.overflow_electives:
-            if course.course_code not in unique_overflow_codes:
-                unique_overflow_list.append(course)
-                unique_overflow_codes.add(course.course_code)
-        
-        return sections, unique_overflow_list
+        return sections, overflow_courses

@@ -28,7 +28,7 @@ SEMESTERS_TO_RUN = [1, 3, 5, 7]
 DEPARTMENTS = ["CSE", "DSAI", "ECE"]
 
 def create_sections(semester: int, period: str) -> List[Section]:
-    """
+    """  
     Generates the list of Section objects for a given semester and period.
     """
     sections = []

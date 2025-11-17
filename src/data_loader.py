@@ -1,6 +1,6 @@
 """
 src/data_loader.py
-(Rebuilt to correctly handle new 'elective'/'basket' logic and Sem 7)
+(Corrected with Type 1/Type 2 bundling and 'parent_pseudo_name' tagging)
 """
 
 import csv
@@ -53,49 +53,52 @@ def load_classrooms(filepath: str) -> List[Classroom]:
     print(f"Successfully loaded {len(classrooms)} classrooms.")
     return classrooms
 
-def _create_pseudo_courses(courses: List[Course]) -> List[Course]:
+def _bundle_baskets_and_electives(courses: List[Course]) -> List[Course]:
     """
-    Bundles Sem 1/3 'electives' and Sem 5/7 'baskets' into pseudo-courses.
+    Finds ALL elective/basket courses and bundles them based on the
+    new rules:
+    - ELECTIVES (Type 1): Cross-departmental (Sem, Basket)
+    - BASKETS (Type 2): Department-specific (Sem, Dept, Basket)
     """
     print("Bundling electives and baskets...")
     
-    # --- NEW: Two-stage bundling ---
+    # Key = (Semester, Basket Code)
+    elective_bundles: Dict[Tuple[int, str], List[Course]] = {}
     
-    # 1. Sem 1/3 Electives: Key = (Semester, Basket Code)
-    sem_1_3_electives: Dict[Tuple[int, str], List[Course]] = {}
+    # Key = (Semester, Department, Basket Code)
+    basket_bundles: Dict[Tuple[int, str, str], List[Course]] = {}
     
-    # 2. Sem 5/7 Baskets: Key = (Semester, Department, Basket_Code)
-    sem_5_7_baskets: Dict[Tuple[int, str, str], List[Course]] = {}
-    
-    courses_to_keep: List[Course] = [] # Non-basket/elective courses
+    courses_to_keep: List[Course] = []
     
     for course in courses:
         pref = course.pre_post_preference.lower()
         
-        # Rule: 'elective' + basket_code + Sem 1/3
-        if pref == 'elective' and course.semester in [1, 3] and course.basket_code:
+        if pref == 'elective' and course.basket_code:
             key = (course.semester, course.basket_code)
-            sem_1_3_electives.setdefault(key, []).append(course)
-        # Rule: 'basket' + basket_code + Sem 5/7
-        elif pref == 'basket' and course.semester in [5, 7] and course.basket_code:
+            elective_bundles.setdefault(key, []).append(course)
+            
+        elif pref == 'basket' and course.basket_code:
             key = (course.semester, course.department, course.basket_code)
-            sem_5_7_baskets.setdefault(key, []).append(course)
+            basket_bundles.setdefault(key, []).append(course)
+            
         else:
+            # This is a core course or a combined course
             courses_to_keep.append(course)
             
-    print(f"Found {len(sem_1_3_electives)} (Sem 1/3) elective bundles.")
-    print(f"Found {len(sem_5_7_baskets)} (Sem 5/7) basket bundles.")
+    print(f"Found {len(elective_bundles)} cross-departmental ELECTIVE bundles (Type 1).")
+    print(f"Found {len(basket_bundles)} department-specific BASKET bundles (Type 2).")
     
-    # --- Process Sem 1/3 Electives ---
-    for key, bundle in sem_1_3_electives.items():
+    # --- Process Type 1: ELECTIVES (Cross-departmental) ---
+    for key, bundle in elective_bundles.items():
         sem, basket = key
         template = bundle[0]
+        pseudo_name = f"Elective ({basket})" # This is the name we want to display
         
         pseudo_course = Course(
-            course_code=f"ELECTIVE_{sem}_{basket}",
-            course_name=f"Elective ({basket})",
+            course_code=f"PSEUDO_{sem}_{basket}",
+            course_name=pseudo_name,
             semester=sem,
-            department="ALL_DEPTS", # Electives are cross-departmental
+            department="ALL_DEPTS",  # Cross-departmental
             ltpsc_str=template.ltpsc_str,
             credits=template.credits,
             instructors=["TBD"],
@@ -103,22 +106,29 @@ def _create_pseudo_courses(courses: List[Course]) -> List[Course]:
             is_elective=False,
             is_half_semester=template.is_half_semester,
             is_combined=False,
-            pre_post_preference="overflow", # Rule: Pre or Post
-            basket_code="",
-            is_pseudo_course=True
+            pre_post_preference=template.pre_post_preference,
+            basket_code=basket,
+            is_pseudo_basket=True,
+            bundled_courses=bundle
         )
+        
+        # "Tag" the original courses with the name to display
+        for original_course in bundle:
+            original_course.parent_pseudo_name = pseudo_name
+            
         courses_to_keep.append(pseudo_course)
-
-    # --- Process Sem 5/7 Baskets ---
-    for key, bundle in sem_5_7_baskets.items():
+        
+    # --- Process Type 2: BASKETS (Department-specific) ---
+    for key, bundle in basket_bundles.items():
         sem, dept, basket = key
         template = bundle[0]
-        
+        pseudo_name = f"Basket ({basket})" # This is the name we want to display
+
         pseudo_course = Course(
-            course_code=f"BASKET_{sem}_{dept}_{basket}",
-            course_name=f"Basket ({basket})",
+            course_code=f"PSEUDO_{sem}_{dept}_{basket}",
+            course_name=pseudo_name,
             semester=sem,
-            department=dept, # Baskets are department-specific
+            department=dept,  # Department-specific
             ltpsc_str=template.ltpsc_str,
             credits=template.credits,
             instructors=["TBD"],
@@ -126,15 +136,20 @@ def _create_pseudo_courses(courses: List[Course]) -> List[Course]:
             is_elective=False,
             is_half_semester=template.is_half_semester,
             is_combined=False,
-            pre_post_preference="basket_full", # Rule: Runs all semester
-            basket_code="",
-            is_pseudo_course=True
+            pre_post_preference=template.pre_post_preference,
+            basket_code=basket,
+            is_pseudo_basket=True,
+            bundled_courses=bundle
         )
+        
+        # "Tag" the original courses with the name to display
+        for original_course in bundle:
+            original_course.parent_pseudo_name = pseudo_name
+
         courses_to_keep.append(pseudo_course)
         
     print(f"Total courses after bundling: {len(courses_to_keep)}")
     return courses_to_keep
-
 
 def load_and_process_courses(filepath: str) -> Tuple[List[Course], List[Course]]:
     """
@@ -172,7 +187,7 @@ def load_and_process_courses(filepath: str) -> Tuple[List[Course], List[Course]]
                         
                     semester = int(row.get("Semester", 0))
                     
-                    if semester not in [1, 3, 5, 7]:
+                    if semester not in [1, 3, 5, 7]: 
                         continue
                         
                     course = Course(
@@ -188,7 +203,7 @@ def load_and_process_courses(filepath: str) -> Tuple[List[Course], List[Course]]
                         is_half_semester=is_half_sem,
                         is_combined=is_combined,
                         pre_post_preference=row.get("Pre /Post", ""),
-                        basket_code=row.get("Basket Code", "").strip().upper()
+                        basket_code=row.get("Basket Code", "").strip()
                     )
                     
                     all_courses.append(course)
@@ -202,7 +217,7 @@ def load_and_process_courses(filepath: str) -> Tuple[List[Course], List[Course]]
 
     print(f"Loaded and validated {len(all_courses)} course offerings for Semesters 1, 3, 5, 7.")
     
-    processed_courses = _create_pseudo_courses(all_courses)
+    processed_courses = _bundle_baskets_and_electives(all_courses)
     print(f"Bundling complete. Total processed courses: {len(processed_courses)}")
 
     pre_midsem_courses: List[Course] = []
@@ -210,21 +225,10 @@ def load_and_process_courses(filepath: str) -> Tuple[List[Course], List[Course]]
 
     for course_template in processed_courses:
         course = copy.deepcopy(course_template)
-        pref = course.pre_post_preference # This is now lowercase from the model
         
-        # --- NEW SEM 7 RULE ---
-        # If it's a Sem 7 course, it ONLY goes in the PRE list.
-        if course.semester == 7:
-            if pref in ['full', 'pre/post', 'basket_full', 'pre', 'basket']:
-                pre_midsem_courses.append(course)
-            elif pref == 'post':
-                print(f"Warning: Sem 7 course {course.course_code} is 'post' only. This is not allowed. Skipping.")
-            elif pref == 'elective':
-                course.pre_post_preference = "overflow"
-                pre_midsem_courses.append(course)
-            continue # Go to the next course
-            
-        # --- Normal Logic for Sem 1, 3, 5 ---
+        # The model's __post_init__ now correctly lowercases the preference.
+        pref = course.pre_post_preference 
+        
         if pref == 'pre':
             pre_midsem_courses.append(course)
             
@@ -236,33 +240,40 @@ def load_and_process_courses(filepath: str) -> Tuple[List[Course], List[Course]]
             post_midsem_courses.append(copy.deepcopy(course))
             
         elif pref == 'pre/post':
+            # This is your rule for Phase 6
             course.pre_post_preference = "SPLIT"
             pre_midsem_courses.append(course)
             post_midsem_courses.append(copy.deepcopy(course))
             
-        elif pref == 'overflow': # (From pseudo-elective)
+        elif pref == 'elective':
+            # This is your rule for Phase 8 overflow
+            course.pre_post_preference = "OVERFLOW"
             pre_midsem_courses.append(course)
             
-        elif pref == 'basket_full': # (From pseudo-basket)
+        elif pref == 'basket':
+            course.pre_post_preference = "BASKET_FULL"
             pre_midsem_courses.append(course)
             post_midsem_courses.append(copy.deepcopy(course))
         
-        elif pref == '' and not course.is_pseudo_course:
+        elif pref == '':
             if course.is_half_semester:
                 if not course.is_elective:
+                    print(f"Warning: Course {course.course_code} is Half_Sem but has blank Pre/Post. Defaulting to SPLIT.")
                     course.pre_post_preference = "SPLIT"
                     pre_midsem_courses.append(course)
                     post_midsem_courses.append(copy.deepcopy(course))
                 else:
-                    course.pre_post_preference = "overflow"
+                    print(f"Warning: Course {course.course_code} is Elective but has blank Pre/Post. Defaulting to OVERFLOW.")
+                    course.pre_post_preference = "OVERFLOW"
                     pre_midsem_courses.append(course)
             else:
+                print(f"Warning: Course {course.course_code} has blank Pre/Post. Defaulting to FULL.")
                 course.pre_post_preference = "FULL"
                 pre_midsem_courses.append(course)
                 post_midsem_courses.append(copy.deepcopy(course))
         
-        elif pref not in ['elective', 'basket']:
-             print(f"Warning: Unknown Pre/Post preference '{pref}' for {course.course_code}. Skipping.")
+        else:
+            print(f"Warning: Unknown Pre/Post preference '{pref}' for {course.course_code}. Skipping.")
 
     print(f"Processed courses: {len(pre_midsem_courses)} pre-midsem definitions, {len(post_midsem_courses)} post-midsem definitions.")
     return pre_midsem_courses, post_midsem_courses

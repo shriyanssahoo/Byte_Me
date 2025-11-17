@@ -16,7 +16,7 @@ import io
 from typing import List, Dict, Set, Optional
 from flask import Flask, render_template_string, jsonify, send_file, request, url_for
 
-# --- FIX: Use absolute imports from the 'src' package ---
+# --- Absolute Imports from the 'src' package ---
 try:
     import src.utils as utils
     from src.models import Section, Classroom, Course, Timetable
@@ -27,6 +27,13 @@ try:
 except ImportError as e:
     print(f"FATAL ERROR: Could not import 'src' modules: {e}")
     print("Please ensure 'src/__init__.py' exists and this script is in the root folder.")
+    print("Your project structure should be:")
+    print("  Byte_Me/ (your root folder)")
+    print("  ├── web_app.py (this file)")
+    print("  └── src/")
+    print("      ├── __init__.py")
+    print("      ├── data_loader.py")
+    print("      └── ... (all other .py files)")
     sys.exit(1)
 
 
@@ -39,7 +46,7 @@ g_all_sections: List[Section] = []
 g_all_faculty_schedules: Dict[str, Timetable] = {}
 g_all_classrooms: List[Classroom] = []
 g_course_color_map: Dict[str, str] = {}
-g_course_db: Dict[str, Course] = {}
+g_course_db: Dict[str, Course] = {} # For admin data
 
 
 def generate_color_map(sections: List[Section]) -> Dict[str, str]:
@@ -244,14 +251,12 @@ def _build_timetable_html(timetable: Timetable, view_type: str = 'section') -> s
     
     html = '<table class="timetable-grid">'
     
-    # Header Row (Times)
     html += '<thead><tr><th>Time / Day</th>'
     time_slots = utils.get_time_slots_list()
     for time_str in time_slots:
         html += f'<th>{time_str}</th>'
     html += '</tr></thead>'
     
-    # Body Rows (Days)
     html += '<tbody>'
     for day_idx, day_name in enumerate(utils.DAYS):
         html += f'<tr><td class="day-header">{day_name}</td>'

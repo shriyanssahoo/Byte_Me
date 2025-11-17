@@ -1,6 +1,6 @@
 """
 src/excel_exporter.py
-(Corrected to accept BytesIO objects from the web app)
+(Corrected to capitalize the session_type for display)
 """
 
 import openpyxl
@@ -8,8 +8,7 @@ from openpyxl.workbook import Workbook
 from openpyxl.worksheet.worksheet import Worksheet
 from openpyxl.styles import Font, Border, Side, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
-from typing import List, Dict, Set, Union # FIX: Import Union
-import io # FIX: Import io
+from typing import List, Dict, Set
 from .models import Section, Classroom, Timetable, ScheduledClass
 from . import utils
 import random
@@ -28,10 +27,6 @@ BREAK_FONT = Font(color="808080", size=9)
 
 
 class ExcelExporter:
-    """
-    Handles the creation of the two complex Excel output files.
-    """
-    
     def __init__(self, all_sections: List[Section], all_classrooms: List[Classroom], 
                  all_faculty_schedules: Dict[str, Timetable]):
         
@@ -42,13 +37,15 @@ class ExcelExporter:
         print("\nInitializing Excel Exporter...")
 
     def _generate_color_map(self) -> Dict[str, str]:
-        """Generates a unique hex color for each course code."""
         course_codes: Set[str] = set()
         for section in self.all_sections:
             for day_schedule in section.timetable.grid:
                 for slot in day_schedule:
                     if slot and slot.course.course_code not in ["LUNCH", "BREAK"]:
-                        course_codes.add(slot.course.course_code)
+                        if slot.course.parent_pseudo_name:
+                            course_codes.add(slot.course.parent_pseudo_name)
+                        else:
+                            course_codes.add(slot.course.course_code)
         
         color_map = {}
         for code in course_codes:
@@ -62,9 +59,6 @@ class ExcelExporter:
         return color_map
 
     def _format_cell_content(self, s_class: ScheduledClass, view_type: str) -> str:
-        """
-        Creates the content for a timetable cell.
-        """
         if not s_class:
             return ""
         if s_class.course.course_code == "LUNCH":
@@ -77,13 +71,28 @@ class ExcelExporter:
         section_str = s_class.section_id
         
         instructor_str = ", ".join(s_class.instructors)
-        session_str = f"({s_class.session_type})"
+        # --- THIS IS THE FIX ---
+        # Capitalize the lowercase session type for display
+        session_str = f"({s_class.session_type.capitalize()})"
+        # --- END OF FIX ---
         
-        if s_class.course.is_pseudo_course:
-            instructor_str = "" # Hide TBD
-            match = re.search(r'\((.*?)\)', course_name)
-            session_str = f"({match.group(1)})" if match else "(Elective/Basket)"
-        
+        if s_class.course.parent_pseudo_name:
+            course_name = s_class.course.parent_pseudo_name
+            instructor_str = "" 
+            if "elective" in course_name.lower():
+                session_str = "(Elective)"
+            else:
+                session_str = "(Basket)"
+                
+        elif s_class.course.is_pseudo_basket:
+            course_name = s_class.course.course_name
+            instructor_str = ""
+            room_str = "TBD"
+            if "elective" in course_name.lower():
+                session_str = "(Elective)"
+            else:
+                session_str = "(Basket)"
+
         if view_type == 'section':
             return f"{course_name}\n{session_str}\n{instructor_str}\n{room_str}".strip()
         elif view_type == 'faculty':
@@ -93,11 +102,6 @@ class ExcelExporter:
 
 
     def _style_and_fill_sheet(self, ws: Worksheet, timetable: Timetable, view_type: str):
-        """
-        Applies standard formatting and fills a single timetable sheet.
-        --- PIVOTED: DAYS = ROWS, TIMES = COLUMNS ---
-        """
-        
         ws.cell(row=1, column=1, value="Time / Day").fill = HEADER_FILL
         ws.cell(row=1, column=1).font = HEADER_FONT
         ws.column_dimensions['A'].width = 18
@@ -114,7 +118,7 @@ class ExcelExporter:
             cell = ws.cell(row=r, column=1, value=day)
             cell.fill = DAY_FILL
             cell.font = DAY_FONT
-            cell.alignment = Alignment(horizontal="center", vertical="center")
+            cell.alignment = CENTER_ALIGN
             ws.row_dimensions[r].height = 70
             
         for day_idx in range(len(utils.DAYS)):
@@ -132,8 +136,8 @@ class ExcelExporter:
                     continue
                 
                 duration = 1
-                while (col_idx + duration < utils.TOTAL_SLOTS_PER_DAY and
-                       timetable.grid[day_idx][col_idx + duration] == s_class):
+                while (slot_index + duration < utils.TOTAL_SLOTS_PER_DAY and
+                       timetable.grid[day_idx][slot_index + duration] == s_class):
                     duration += 1
                 
                 ws.merge_cells(
@@ -149,7 +153,13 @@ class ExcelExporter:
                     cell.fill = BREAK_FILL
                     cell.font = BREAK_FONT
                 else:
-                    color = self.course_color_map.get(s_class.course.course_code, "FFFFFF")
+                    color_key = s_class.course.course_code
+                    if s_class.course.parent_pseudo_name:
+                        color_key = s_class.course.parent_pseudo_name
+                    elif s_class.course.is_pseudo_basket:
+                        color_key = s_class.course.course_name
+                    
+                    color = self.course_color_map.get(color_key, "FFFFFF")
                     cell.fill = PatternFill(start_color=color, end_color=color, fill_type="solid")
                 
                 for c in range(col_idx, col_idx + duration):
@@ -157,12 +167,7 @@ class ExcelExporter:
                         
                 col_idx += duration
 
-    # --- FIX: Update type hint to accept str or BytesIO ---
-    def export_department_timetables(self, filepath: Union[str, io.BytesIO]):
-        """
-        Creates the main Department_Timetables.xlsx file with
-        ONLY the Section Timetables.
-        """
+    def export_department_timetables(self, filepath: str):
         print(f"Exporting department timetables to {filepath}...")
         wb = Workbook()
         
@@ -178,18 +183,14 @@ class ExcelExporter:
                 self._style_and_fill_sheet(ws, section.timetable, view_type='section')
             
         try:
-            wb.save(filepath) # This works for both str and BytesIO
-            print(f"Successfully saved department timetables.")
+            wb.save(filepath)
+            print(f"Successfully saved department timetables to {filepath}")
         except PermissionError:
             print(f"FATAL ERROR: Could not save to {filepath}. Is the file open in Excel?")
         except Exception as e:
             print(f"FATAL ERROR: Could not save department timetables. {e}")
 
-    # --- FIX: Update type hint to accept str or BytesIO ---
-    def export_faculty_timetables(self, filepath: Union[str, io.BytesIO]):
-        """
-        Creates the separate Faculty_Timetables.xlsx file.
-        """
+    def export_faculty_timetables(self, filepath: str):
         print(f"Exporting faculty timetables to {filepath}...")
         wb = Workbook()
         
@@ -211,8 +212,8 @@ class ExcelExporter:
             self._style_and_fill_sheet(ws, timetable, view_type='faculty')
             
         try:
-            wb.save(filepath) # This works for both str and BytesIO
-            print(f"Successfully saved faculty timetables.")
+            wb.save(filepath)
+            print(f"Successfully saved faculty timetables to {filepath}")
         except PermissionError:
             print(f"FATAL ERROR: Could not save to {filepath}. Is the file open in Excel?")
         except Exception as e:

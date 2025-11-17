@@ -1,6 +1,6 @@
 """
 src/excel_exporter.py
-(Corrected to hide TBD instructors for baskets/electives)
+(Corrected to accept BytesIO objects from the web app)
 """
 
 import openpyxl
@@ -8,7 +8,8 @@ from openpyxl.workbook import Workbook
 from openpyxl.worksheet.worksheet import Worksheet
 from openpyxl.styles import Font, Border, Side, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
-from typing import List, Dict, Set
+from typing import List, Dict, Set, Union # FIX: Import Union
+import io # FIX: Import io
 from .models import Section, Classroom, Timetable, ScheduledClass
 from . import utils
 import random
@@ -75,18 +76,13 @@ class ExcelExporter:
         room_str = ", ".join(s_class.room_ids)
         section_str = s_class.section_id
         
-        # --- NEW LOGIC for Instructors/Session ---
         instructor_str = ", ".join(s_class.instructors)
         session_str = f"({s_class.session_type})"
         
         if s_class.course.is_pseudo_course:
             instructor_str = "" # Hide TBD
-            # Extract (A) from "Elective (A)"
             match = re.search(r'\((.*?)\)', course_name)
-            if match:
-                session_str = f"({match.group(1)})" # Shows "(A)" or "(B)"
-            else:
-                session_str = "(Elective/Basket)"
+            session_str = f"({match.group(1)})" if match else "(Elective/Basket)"
         
         if view_type == 'section':
             return f"{course_name}\n{session_str}\n{instructor_str}\n{room_str}".strip()
@@ -118,7 +114,7 @@ class ExcelExporter:
             cell = ws.cell(row=r, column=1, value=day)
             cell.fill = DAY_FILL
             cell.font = DAY_FONT
-            cell.alignment = CENTER_ALIGN
+            cell.alignment = Alignment(horizontal="center", vertical="center")
             ws.row_dimensions[r].height = 70
             
         for day_idx in range(len(utils.DAYS)):
@@ -136,8 +132,8 @@ class ExcelExporter:
                     continue
                 
                 duration = 1
-                while (slot_index + duration < utils.TOTAL_SLOTS_PER_DAY and
-                       timetable.grid[day_idx][slot_index + duration] == s_class):
+                while (col_idx + duration < utils.TOTAL_SLOTS_PER_DAY and
+                       timetable.grid[day_idx][col_idx + duration] == s_class):
                     duration += 1
                 
                 ws.merge_cells(
@@ -161,7 +157,8 @@ class ExcelExporter:
                         
                 col_idx += duration
 
-    def export_department_timetables(self, filepath: str):
+    # --- FIX: Update type hint to accept str or BytesIO ---
+    def export_department_timetables(self, filepath: Union[str, io.BytesIO]):
         """
         Creates the main Department_Timetables.xlsx file with
         ONLY the Section Timetables.
@@ -181,14 +178,15 @@ class ExcelExporter:
                 self._style_and_fill_sheet(ws, section.timetable, view_type='section')
             
         try:
-            wb.save(filepath)
-            print(f"Successfully saved department timetables to {filepath}")
+            wb.save(filepath) # This works for both str and BytesIO
+            print(f"Successfully saved department timetables.")
         except PermissionError:
             print(f"FATAL ERROR: Could not save to {filepath}. Is the file open in Excel?")
         except Exception as e:
             print(f"FATAL ERROR: Could not save department timetables. {e}")
 
-    def export_faculty_timetables(self, filepath: str):
+    # --- FIX: Update type hint to accept str or BytesIO ---
+    def export_faculty_timetables(self, filepath: Union[str, io.BytesIO]):
         """
         Creates the separate Faculty_Timetables.xlsx file.
         """
@@ -213,8 +211,8 @@ class ExcelExporter:
             self._style_and_fill_sheet(ws, timetable, view_type='faculty')
             
         try:
-            wb.save(filepath)
-            print(f"Successfully saved faculty timetables to {filepath}")
+            wb.save(filepath) # This works for both str and BytesIO
+            print(f"Successfully saved faculty timetables.")
         except PermissionError:
             print(f"FATAL ERROR: Could not save to {filepath}. Is the file open in Excel?")
         except Exception as e:

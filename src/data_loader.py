@@ -226,35 +226,26 @@ def load_and_process_courses(filepath: str) -> Tuple[List[Course], List[Course]]
     for course_template in processed_courses:
         course = copy.deepcopy(course_template)
         
-        # The model's __post_init__ now correctly lowercases the preference.
         pref = course.pre_post_preference 
         
         if pref == 'pre':
             pre_midsem_courses.append(course)
-            
         elif pref == 'post':
             post_midsem_courses.append(course)
-            
         elif pref == 'full':
             pre_midsem_courses.append(course)
             post_midsem_courses.append(copy.deepcopy(course))
-            
         elif pref == 'pre/post':
-            # This is your rule for Phase 6
             course.pre_post_preference = "SPLIT"
             pre_midsem_courses.append(course)
             post_midsem_courses.append(copy.deepcopy(course))
-            
         elif pref == 'elective':
-            # This is your rule for Phase 8 overflow
             course.pre_post_preference = "OVERFLOW"
             pre_midsem_courses.append(course)
-            
         elif pref == 'basket':
             course.pre_post_preference = "BASKET_FULL"
             pre_midsem_courses.append(course)
             post_midsem_courses.append(copy.deepcopy(course))
-        
         elif pref == '':
             if course.is_half_semester:
                 if not course.is_elective:
@@ -271,7 +262,6 @@ def load_and_process_courses(filepath: str) -> Tuple[List[Course], List[Course]]
                 course.pre_post_preference = "FULL"
                 pre_midsem_courses.append(course)
                 post_midsem_courses.append(copy.deepcopy(course))
-        
         else:
             print(f"Warning: Unknown Pre/Post preference '{pref}' for {course.course_code}. Skipping.")
 

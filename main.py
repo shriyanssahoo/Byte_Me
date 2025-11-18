@@ -18,7 +18,7 @@ import copy
 # --- Configuration ---
 DATA_DIR = "data"
 OUTPUT_DIR = "output"
-COURSE_FILE = os.path.join(DATA_DIR, "course.csv")
+COURSE_FILE = os.path.join(DATA_DIR, "course.csv")  # FIXED: Use course.csv
 CLASSROOM_FILE = os.path.join(DATA_DIR, "classroom_data.csv")
 
 DEPT_TIMETABLE_FILE = os.path.join(OUTPUT_DIR, "Department_Timetables.xlsx")

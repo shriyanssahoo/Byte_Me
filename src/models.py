@@ -211,4 +211,4 @@ class Timetable:
                 if break_slot < utils.TOTAL_SLOTS_PER_DAY and self.grid[day_index][break_slot] is None:
                     self.grid[day_index][break_slot] = self.break_marker
                     if class_info.course.course_code not in ["LUNCH", "BREAK"]:
-                        self.day_load_tracker[day_index] += 1   
+                        self.day_load_tracker[day_index] += 1

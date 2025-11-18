@@ -1,6 +1,5 @@
 """
 src/validators.py
-(Corrected to add LTPSC fulfillment and student break validation)
 """
 
 from typing import List, Dict, Set
@@ -18,7 +17,6 @@ def validate_all(all_sections: List[Section],
     faculty_conflicts = _check_faculty_conflicts(all_faculty_schedules)
     daily_limit_conflicts = _check_daily_limits(all_sections)
     break_conflicts = _check_student_breaks(all_sections)
-    # --- NEW: LTPSC Check ---
     ltpsc_conflicts = _check_ltpsc_fulfillment(all_sections)
     
     if not student_conflicts and not faculty_conflicts and not daily_limit_conflicts and not break_conflicts and not ltpsc_conflicts:
@@ -165,7 +163,6 @@ def _check_student_breaks(all_sections: List[Section]) -> List[str]:
                         
     return conflicts
 
-# --- NEW: LTPSC Fulfillment Check ---
 def _check_ltpsc_fulfillment(all_sections: List[Section]) -> List[str]:
     """
     Checks if the total number of scheduled sessions for each course
@@ -173,36 +170,29 @@ def _check_ltpsc_fulfillment(all_sections: List[Section]) -> List[str]:
     """
     conflicts = []
     
-    # We must find the original course definitions, not the pseudo-baskets
-    # This check is tricky. We'll check the count on the timetable object.
-    
     for section in all_sections:
         
-        # Invert the section's session counter to be {course_code: {session: count}}
         course_session_counts: Dict[str, Dict[str, int]] = {}
         for key, count in section.timetable.total_session_counts.items():
             parts = key.split('_')
             if len(parts) < 2: continue
             
             course_code = parts[0]
-            session_type = parts[1]
+            session_type = parts[1] # is lowercase
             
             if course_code not in course_session_counts:
                 course_session_counts[course_code] = {}
             course_session_counts[course_code][session_type] = count
             
-        # Get the original courses for this section
-        # (This is simplified; we find them by checking what was scheduled)
         scheduled_courses: Dict[str, Course] = {}
         for day_grid in section.timetable.grid:
             for slot in day_grid:
                 if slot and slot.course.course_code not in ["LUNCH", "BREAK"]:
-                    scheduled_courses[slot.course.course_code] = slot.course
+                    if not slot.course.is_pseudo_basket: # Don't check placeholders
+                        scheduled_courses[slot.course.course_code] = slot.course
 
         for course_code, course in scheduled_courses.items():
-            if course.is_pseudo_basket: # Pseudo-baskets use template LTPSC
-                continue # This logic gets complex, skip for now
-                
+            
             required = course.get_required_sessions()
             scheduled = course_session_counts.get(course_code, {})
             
@@ -210,12 +200,10 @@ def _check_ltpsc_fulfillment(all_sections: List[Section]) -> List[str]:
             req_tut = required.get('tutorial', 0)
             req_prac = required.get('practical', 0)
             
-            # Combine scheduled lectures and tutorials as per L=1 rule
             sch_lect = scheduled.get('lecture', 0)
             sch_tut = scheduled.get('tutorial', 0)
             sch_prac = scheduled.get('practical', 0)
             
-            # L=1 rule makes L a tutorial
             if course.L == 1:
                 req_tut += req_lect
                 req_lect = 0
@@ -227,5 +215,4 @@ def _check_ltpsc_fulfillment(all_sections: List[Section]) -> List[str]:
             if sch_prac != req_prac:
                 conflicts.append(f"LTPSC Mismatch: {section.id} for {course_code}: Expected {req_prac} Practicals, got {sch_prac}")
 
-    # Remove duplicates
     return sorted(list(set(conflicts)))

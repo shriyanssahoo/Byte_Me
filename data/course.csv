@@ -8,11 +8,11 @@ HS161,English Language and Communication,1,CSE,3-0-0-0-3,3,Rajesh N S,200,No,No,
 PH151,Introduction to Physics,1,CSE,2-0-0-0-2,2,"Ravishankar, Vivekraj",0,Yes,Yes,no,elective,A
 DS151,Linux for Engineers,1,CSE,2-0-0-0-2,2,Vivekraj,0,Yes,Yes,no,elective,A
 CS101,Fundamentals of Computing,1,CSE,2-0-0-0-2,2,Mallikarjun Kande,0,Yes,Yes,no,elective,A
-HS157,Computational Thinking,1,CSE,2-0-0-0-2,1,Chandrika Kamat,0,Yes,No,no,elective,A
+HS157,Computational Thinking,1,CSE,2-0-0-0-2,1,Chandrika Kamat,0,Yes,Yes,no,elective,A
 HS102,Kannada Kali-Nali,1,CSE,2-0-0-0-2,2,Anand B,0,Yes,Yes,no,elective,A
 HS103,Leveraging IT for Better Life,1,CSE,2-0-0-0-2,2,Rajesh N S,0,Yes,Yes,no,elective,A
 DE101,Basics of Design,1,CSE,2-0-0-0-2,2,Sandesh P,0,Yes,Yes,no,elective,A
-HS156,Holistic Personality Development,1,CSE,2-0-0-0-2,1,Rajesh N S,0,Yes,No,no,elective,A
+HS156,Holistic Personality Development,1,CSE,2-0-0-0-2,1,Rajesh N S,0,Yes,Yes,no,elective,A
 CS151,Introduction to C Programming,1,CSE,2-0-0-0-2,2,Girish Revadigar,0,Yes,Yes,no,elective,A
 MA261,Differential Equations,3,CSE,3-1-0-0-2,2,Anand B,200,No,Yes,yes,Pre,
 MA262,Multivariable Calculus,3,CSE,3-1-0-0-2,2,Somen B,200,No,Yes,yes,Post,
@@ -20,7 +20,7 @@ CS261,Operating Systems,3,CSE,3-0-0-4-2,2,Suvadip Hazra,200,No,Yes,no,Pre,
 CS262,Software Design,3,CSE,2-0-2-0-3,3,"Sunil P V, Vivekraj",200,No,No,no,full,
 CS263,Design & Analysis of Algorithms,3,CSE,3-0-2-0-4,4,"Malay, Pramod",200,No,No,no,full,
 CS264,Computer Networks,3,CSE,3-1-0-0-4,4,Prabhu Prasad B M,200,No,No,no,full,
-HS262,EVS,3,CSE,0-0-0-0-1,1,Aswath Babu,0,Yes,No,no,full,B
+HS262,HSS (EVS),3,CSE,0-0-0-0-1,1,Aswath Babu,0,Yes,No,no,full,B
 HS261,HSS (Ethics),3,CSE,3-0-0-0-2,2,Ganesh,0,Yes,No,yes,full,B
 EC251,Electronics Design,3,CSE,2-0-0-0-2,2,Pankaj Kumar,0,Yes,Yes,no,elective,A
 EC252,Introduction of Communication,3,CSE,2-0-0-0-2,2,Rajesh Kumar,0,Yes,Yes,no,elective,A
@@ -49,15 +49,7 @@ MA162,Probability,1,DSAI,3-1-0-0-2,2,Chinmayananda,0,No,Yes,yes,Pre,
 EC161,Digital Design,1,DSAI,3-0-2-0-2,2,Prakash Pawar,0,No,Yes,yes,Pre,
 CS161,Problem Solving with Python,1,DSAI,3-0-2-0-4,4,Animesh Roy,0,No,No,no,full,
 HS123,Economics/IET,1,DSAI,3-0-0-0-3,3,Anushree Kini,0,yes,No,no,full,
-PH151,Introduction to Physics,1,DSAI,2-0-0-0-2,2,Ravishankar,0,Yes,Yes,no,elective,A
-DS151,Linux for Engineers,1,DSAI,2-0-0-0-2,2,Vivekraj,0,Yes,Yes,no,elective,A
-CS101,Fundamentals of Computing,1,DSAI,2-0-0-0-2,2,Mallikarjun Kande,0,Yes,Yes,no,elective,A
-HS157,Computational Thinking,1,DSAI,2-0-0-0-2,1,Chandrika Kamat,0,Yes,No,no,elective,A
-HS102,Kannada Kali-Nali,1,DSAI,2-0-0-0-2,2,Anand B,0,Yes,Yes,no,elective,A
-HS103,Leveraging IT for Better Life,1,DSAI,2-0-0-0-2,2,Rajesh N S,0,Yes,Yes,no,elective,A
-DE101,Basics of Design,1,DSAI,2-0-0-0-2,2,Sandesh P,0,Yes,Yes,no,elective,A
-HS156,Holistic Personality Development,1,DSAI,2-0-0-0-2,1,Rajesh N S,0,Yes,No,no,elective,A
-CS151,Introduction to C Programming,1,DSAI,2-0-0-0-2,2,Girish Revadigar,0,Yes,Yes,no,elective,A
+PH151,Elective,1,DSAI,2-0-0-0-2,2,Ravishankar,0,Yes,Yes,no,elective,A
 MA262,Multivariable Calculus,3,DSAI,3-1-0-0-2,2,Somen B,0,No,No,yes,pre,
 MA261,Differential Equations,3,DSAI,3-1-0-0-2,2,Anand B,0,No,No,yes,post,
 DA261,Statistical Programming,3,DSAI,1-0-2-0-2,2,Ramesh Athe,0,No,Yes,no,pre,
@@ -65,16 +57,7 @@ DA262,Data Handling,3,DSAI,2-0-2-0-3,3,Siddharth,0,No,No,no,full,
 CS304,Artificial Intelligence,3,DSAI,3-1-0-0-4,4,Animesh Chaturvedi,0,No,No,no,full,
 CS307,Machine Learning,3,DSAI,3-0-2-0-4,4,Utkarsh K,0,No,No,no,full,
 HS105,Neuro-Linguistics,3,DSAI,1-0-0-0-1,1,Manjunath K V,0,Yes,No,no,elective,B
-HS106,Leadership I,3,DSAI,1-0-0-0-1,1,Jagadeesha R B,0,Yes,No,no,elective,B
-HS107,Sociology for India,3,DSAI,1-0-0-0-1,1,Anushree Kini,0,Yes,No,no,elective,B
-HS108,Social Impact,3,DSAI,1-0-0-0-1,1,Rajesh Kumar,0,Yes,No,no,elective,B
-HS109,Holistic Personality,3,DSAI,1-0-0-0-1,1,Rajesh N S,0,Yes,No,no,elective,B
 EC251,Electronics Design,3,DSAI,2-0-0-0-2,2,Pankaj Kumar,0,Yes,Yes,no,elective,A
-EC252,Introduction of Communication,3,DSAI,2-0-0-0-2,2,Rajesh Kumar,0,Yes,Yes,no,elective,A
-CS253,Introduction to AI,3,DSAI,2-0-0-0-2,2,Sibasankar Padhy,0,Yes,Yes,no,elective,A
-EC254,Electronic Systems,3,DSAI,2-0-0-0-2,2,Mallikarjun Kande,0,Yes,Yes,no,elective,A
-CS152,Data Science with Python,3,DSAI,2-0-0-0-2,2,Abdul Wahid,0,Yes,Yes,no,elective,A
-ASD352,User Interaction,3,DSAI,3-1-0-0-4,4,Sandesh P,0,Yes,No,no,elective,A
 DS302,Computer Communication,5,DSAI,3-1-2-0-5,5,Shirshendu Layek,0,No,No,no,full,
 DS303,Algorithms and Data Structures,5,DSAI,3-1-0-0-4,4,Animesh Chaturvedi,0,No,No,no,full,
 CS307,Machine Learning,5,DSAI,3-0-2-0-4,4,Siddharth,0,No,No,no,full,
@@ -94,29 +77,13 @@ MA162,Probability,1,ECE,3-1-0-0-2,2,Chinmayananda,0,No,Yes,yes,Pre,
 EC161,Digital Design,1,ECE,3-0-2-0-2,2,Prakash Pawar,0,No,Yes,yes,Pre,
 CS161,Problem Solving with Python,1,ECE,3-0-2-0-4,4,Manjunath,0,No,No,no,full,
 HS123,Economics/IET,1,ECE,3-0-0-0-3,3,Anushree Kini,0,No,No,no,full,
-PH151,Introduction to Physics,1,ECE,2-0-0-0-2,2,Ravishankar,0,Yes,Yes,no,elective,A
-DS151,Linux for Engineers,1,ECE,2-0-0-0-2,2,Vivekraj,0,Yes,Yes,no,elective,A
-CS101,Fundamentals of Computing,1,ECE,2-0-0-0-2,2,Mallikarjun Kande,0,Yes,Yes,no,elective,A
-HS157,Computational Thinking,1,ECE,2-0-0-0-2,1,Chandrika Kamat,0,Yes,No,no,elective,A
-HS102,Kannada Kali-Nali,1,ECE,2-0-0-0-2,2,Anand B,0,Yes,Yes,no,elective,A
-HS103,Leveraging IT for Better Life,1,ECE,2-0-0-0-2,2,Rajesh N S,0,Yes,Yes,no,elective,A
-DE101,Basics of Design,1,ECE,2-0-0-0-2,2,Sandesh P,0,Yes,Yes,no,elective,A
-HS156,Holistic Personality Development,1,ECE,2-0-0-0-2,1,Rajesh N S,0,Yes,No,no,elective,A
-CS151,Introduction to C Programming,1,ECE,2-0-0-0-2,2,Girish Revadigar,0,Yes,Yes,no,elective,A
+PH151,Elective,1,ECE,2-0-0-0-2,2,Ravishankar,0,Yes,Yes,no,elective,A
 EC301,Digital Signal Processing,5,ECE,3-0-2-0-4,4,Sibasankar Padhy,0,No,No,no,full,
 EC302,Introduction to VLSI Design,5,ECE,3-1-0-0-4,4,Jagadish D.N,0,No,No,no,full,
 CS263,Introduction to Algorithms,5,ECE,3-1-0-0-4,4,Jagdish R.B,0,No,No,no,full,
 HS201,Happiness & Wellbeing,5,ECE,3-0-0-0-3,3,Chandrika Kamath,0,No,No,no,full,
 CS463,Parallel computing,5,ECE,3-1-0-0-4,4,Pramod,0,Yes,No,no,basket,A
-CS308,Compiler Design,5,ECE,3-1-0-0-4,4,Pavan Kumar,0,Yes,No,no,basket,A
-DS301,Graphs and Social Network,5,ECE,3-1-0-0-4,4,Utkarsh K,0,Yes,No,no,basket,A
-EC368,Semiconductor Device Modeling,5,ECE,3-1-0-0-4,4,Pankaj Kumar,0,Yes,No,no,basket,A
-CS366,Advanced Algorithm Design,5,ECE,3-1-0-0-4,4,Suvadip Hazra,0,Yes,No,no,basket,A
 DS359,Full Stack Development,5,ECE,3-1-0-0-4,4,Manjunath K V,0,Yes,No,no,basket,B
-EC355,Internet of Things,5,ECE,3-1-0-0-4,4,Prakash Pawar,0,Yes,No,no,basket,B
-CS352,Cryptography & Information Security,5,ECE,3-1-0-0-4,4,Rajendra Hegadi,0,Yes,No,no,basket,B
-DE351,User Interactions and Experience Design,5,ECE,3-1-0-0-4,4,Sandesh P,0,Yes,No,no,basket,B
-EC358,AI in Biomedical Signal Interpretation,5,ECE,3-1-0-0-4,4,Sibasankar Padhy,0,Yes,No,no,basket,B
 MA262,Multivariable Calculus,3,ECE,3-1-0-0-2,2,Somen B,0,No,Yes,yes,pre,
 MA261,Differential Equations,3,ECE,3-1-0-0-2,2,Anand B,0,No,Yes,yes,post,
 EC303,Random Processes,3,ECE,3-1-0-0-2,2,Chinmayananda,0,No,Yes,no,pre,

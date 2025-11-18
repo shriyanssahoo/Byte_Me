@@ -2,7 +2,10 @@
 src/excel_exporter.py
 (Corrected to capitalize the session_type for display)
 """
-
+# src/excel_exporter.py
+import io
+from typing import Union
+# ... other imports like openpyxl
 import openpyxl
 from openpyxl.workbook import Workbook
 from openpyxl.worksheet.worksheet import Worksheet
@@ -167,7 +170,7 @@ class ExcelExporter:
                         
                 col_idx += duration
 
-    def export_department_timetables(self, filepath: str):
+    def export_department_timetables(self, filepath: Union[str, io.BytesIO]):
         print(f"Exporting department timetables to {filepath}...")
         wb = Workbook()
         
@@ -190,7 +193,7 @@ class ExcelExporter:
         except Exception as e:
             print(f"FATAL ERROR: Could not save department timetables. {e}")
 
-    def export_faculty_timetables(self, filepath: str):
+    def export_faculty_timetables(self, filepath: Union[str, io.BytesIO]):
         print(f"Exporting faculty timetables to {filepath}...")
         wb = Workbook()
         

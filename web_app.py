@@ -28,12 +28,12 @@ except ImportError as e:
     print(f"FATAL ERROR: Could not import 'src' modules: {e}")
     print("Please ensure 'src/__init__.py' exists and this script is in the root folder.")
     print("Your project structure should be:")
-    print("  Byte_Me/ (your root folder)")
-    print("  ├── web_app.py (this file)")
-    print("  └── src/")
-    print("      ├── __init__.py")
-    print("      ├── data_loader.py")
-    print("      └── ... (all other .py files)")
+    print("   Byte_Me/ (your root folder)")
+    print("   ├── web_app.py (this file)")
+    print("   └── src/")
+    print("       ├── __init__.py")
+    print("       ├── data_loader.py")
+    print("       └── ... (all other .py files)")
     sys.exit(1)
 
 
@@ -46,7 +46,7 @@ g_all_sections: List[Section] = []
 g_all_faculty_schedules: Dict[str, Timetable] = {}
 g_all_classrooms: List[Classroom] = []
 g_course_color_map: Dict[str, str] = {}
-g_course_db: Dict[str, Course] = {} # For admin data
+g_course_db: Dict[str, Course] = {}  # For admin data
 
 
 def generate_color_map(sections: List[Section]) -> Dict[str, str]:
@@ -56,7 +56,11 @@ def generate_color_map(sections: List[Section]) -> Dict[str, str]:
         for day_schedule in section.timetable.grid:
             for slot in day_schedule:
                 if slot and slot.course.course_code not in ["LUNCH", "BREAK"]:
-                    course_codes.add(slot.course.course_code)
+                    # Use parent_pseudo_name if available, otherwise course_code
+                    if slot.course.parent_pseudo_name:
+                        course_codes.add(slot.course.parent_pseudo_name)
+                    else:
+                        course_codes.add(slot.course.course_code)
     
     color_map = {}
     for code in course_codes:
@@ -72,7 +76,7 @@ def generate_color_map(sections: List[Section]) -> Dict[str, str]:
 def run_generation_pipeline() -> bool:
     """
     This is the core logic from main.py, refactored as a function.
-    It runs all 8 scheduling passes and populates the global variables.
+    It runs all scheduling phases and populates the global variables.
     """
     global g_is_generated, g_all_sections, g_all_faculty_schedules, g_all_classrooms, g_course_color_map, g_course_db
     
@@ -84,7 +88,7 @@ def run_generation_pipeline() -> bool:
         print("Fatal Error: No classrooms loaded.")
         return False
         
-    pre_midsem_courses, post_midsem_courses = load_and_process_courses("data/courses.csv")
+    pre_midsem_courses, post_midsem_courses = load_and_process_courses("data/course.csv")
     if not pre_midsem_courses and not post_midsem_courses:
         print("Fatal Error: No courses loaded (check data_loader).")
         return False
@@ -290,20 +294,32 @@ def _build_timetable_html(timetable: Timetable, view_type: str = 'section') -> s
                 section_str = s_class.section_id
                 
                 instructor_str = ", ".join(s_class.instructors)
-                session_str = f"({s_class.session_type})"
+                session_str = f"({s_class.session_type.capitalize()})"
                 
-                if s_class.course.is_pseudo_course:
+                # Use parent_pseudo_name for display if available
+                if s_class.course.parent_pseudo_name:
+                    course_name = s_class.course.parent_pseudo_name
                     instructor_str = ""
-                    match = re.search(r'\((.*?)\)', course_name)
-                    session_str = f"({match.group(1)})" if match else "(Elective/Basket)"
+                    session_str = "(Elective/Basket)"
+                elif s_class.course.is_pseudo_basket:
+                    instructor_str = ""
+                    room_str = "TBD"
+                    session_str = "(Elective/Basket)"
                 
                 if view_type == 'section':
                     cell_content = f'<div class="c-name">{course_name}</div><div class="c-session">{session_str}</div><div class="c-details">{instructor_str}<br/>{room_str}</div>'
                 elif view_type == 'faculty':
-                     cell_content = f'<div class="c-name">{course_name}</div><div class="c-session">{session_str}</div><div class="c-details">{section_str}<br/>{room_str}</div>'
+                    cell_content = f'<div class="c-name">{course_name}</div><div class="c-session">{session_str}</div><div class="c-details">{section_str}<br/>{room_str}</div>'
                 
-                color = g_course_color_map.get(s_class.course.course_code, "#FFFFFF")
-                cell_style = f'background-color: {color};'
+                # Color by parent_pseudo_name if available, else course_code
+                color_key = s_class.course.course_code
+                if s_class.course.parent_pseudo_name:
+                    color_key = s_class.course.parent_pseudo_name
+                elif s_class.course.is_pseudo_basket:
+                    color_key = s_class.course.course_name
+                
+                color = g_course_color_map.get(color_key, "#FFFFFF")
+                cell_style = f'background-color: #{color};'
 
             html += f'<td colspan="{duration}" style="{cell_style}">{cell_content}</td>'
             col_idx += duration
@@ -637,7 +653,6 @@ ADMIN_DASHBOARD = """
     td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; font-size: 0.9em; }
     tr:hover { background: #fff5f7; }
     .loading { text-align: center; padding: 40px; color: #999; }
-    
     @media (max-width: 900px) { .dashboard-grid { grid-template-columns: 1fr; } }
 </style>
 </head><body>
@@ -646,20 +661,19 @@ ADMIN_DASHBOARD = """
             <h1>👨‍💼 Admin Dashboard</h1>
             <p>System overview and generation controls</p>
             <div class="actions">
-                <button class="btn btn-gen" onclick="generateTimetable()">🔄 Re-Generate Class Timetable</button>
+                <button class="btn btn-gen" onclick="generateTimetable()">🔄 Re-Generate Timetable</button>
                 <button class="btn btn-secondary" onclick="location.href='/download-class-tt'">📥 Download Class Timetables</button>
-                <button class="btn btn-secondary" onclick="runExamScheduler()">📝 Run Exam Scheduler</button>
+                <button class="btn btn-secondary" onclick="location.href='/download-faculty-tt'">📥 Download Faculty Timetables</button>
                 <button class="btn btn-secondary" onclick="location.href='/'">← Back to Home</button>
             </div>
         </div>
-        
         <div class="dashboard-grid">
             <div class="card">
                 <h2>📊 System Statistics</h2>
                 <div class="stats" id="stats"><div class="loading">Loading...</div></div>
             </div>
             <div class="card">
-                <h2>📚 Courses Loaded (from courses.csv)</h2>
+                <h2>📚 Courses Loaded</h2>
                 <div id="courses" class="data-table"><div class="loading">Loading...</div></div>
             </div>
             <div class="card">
@@ -688,32 +702,40 @@ ADMIN_DASHBOARD = """
                     </div>
                 `;
                 
-                document.getElementById('courses').innerHTML = `
-                    <table>
-                        <tr><th>Code</th><th>Name</th><th>Dept</th><th>Pref</th></tr>
-                        ${data.courses.map(c => `
-                            <tr>
-                                <td>${c.code}</td>
-                                <td>${c.name}</td>
-                                <td>${c.dept}</td>
-                                <td>${c.pref}</td>
-                            </tr>
-                        `).join('')}
-                    </table>
-                `;
+                if (data.courses.length > 0) {
+                    document.getElementById('courses').innerHTML = `
+                        <table>
+                            <tr><th>Code</th><th>Name</th><th>Dept</th><th>Pref</th></tr>
+                            ${data.courses.map(c => `
+                                <tr>
+                                    <td>${c.code}</td>
+                                    <td>${c.name}</td>
+                                    <td>${c.dept}</td>
+                                    <td>${c.pref}</td>
+                                </tr>
+                            `).join('')}
+                        </table>
+                    `;
+                } else {
+                     document.getElementById('courses').innerHTML = '<div class="loading">No courses found.</div>';
+                }
                 
-                document.getElementById('rooms').innerHTML = `
-                    <table>
-                        <tr><th>Room ID</th><th>Type</th><th>Capacity</th></tr>
-                        ${data.rooms.map(r => `
-                            <tr>
-                                <td>${r.id}</td>
-                                <td>${r.type}</td>
-                                <td>${r.capacity}</td>
-                            </tr>
-                        `).join('')}
-                    </table>
-                `;
+                if (data.rooms.length > 0) {
+                    document.getElementById('rooms').innerHTML = `
+                        <table>
+                            <tr><th>Room ID</th><th>Type</th><th>Capacity</th></tr>
+                            ${data.rooms.map(r => `
+                                <tr>
+                                    <td>${r.id}</td>
+                                    <td>${r.type}</td>
+                                    <td>${r.capacity}</td>
+                                </tr>
+                            `).join('')}
+                        </table>
+                    `;
+                } else {
+                    document.getElementById('rooms').innerHTML = '<div class="loading">No rooms found.</div>';
+                }
             });
     }
     
@@ -731,18 +753,10 @@ ADMIN_DASHBOARD = """
         }
     }
     
-    function runExamScheduler() {
-        alert('This will run the separate exam scheduler script in the console. Please check your terminal for output.');
-        fetch('/generate-exams').then(r => r.json()).then(data => {
-            alert(data.message);
-        });
-    }
-    
     document.addEventListener('DOMContentLoaded', loadData);
 </script>
 </body></html>
 """
-
 TIMETABLE_VIEW_PAGE = """
 <!DOCTYPE html>
 <html><head><title>{{ title }}</title>
@@ -757,7 +771,6 @@ TIMETABLE_VIEW_PAGE = """
             <p>{{ subheader }}</p>
             <button class="btn btn-secondary" onclick="location.href='{{ back_url }}'">← Back</button>
         </div>
-        
         <div class="timetable-content">
             <div id="timetable-html">
                 <h2 style="text-align: center; padding: 50px; color: #888;">
@@ -771,25 +784,25 @@ TIMETABLE_VIEW_PAGE = """
             </div>
         </div>
     </div>
-    
-    {% if is_generated %}
-    <script>
-        fetch('{{ api_url }}')
-            .then(response => response.json())
-            .then(data => {
-                const content = document.getElementById('timetable-html');
-                if (data.success) {
-                    content.innerHTML = data.html;
-                } else {
-                    content.innerHTML = `<h2 style="text-align: center; padding: 50px; color: #888;">${data.error}</h2>`;
-                }
-            })
-            .catch(error => {
-                document.getElementById('timetable-html').innerHTML = 
-                    '<h2 style="text-align: center; padding: 50px; color: #888;">Error loading timetable.</h2>';
-            });
-    </script>
-    {% endif %}
+
+{% if is_generated %}
+<script>
+    fetch('{{ api_url }}')
+        .then(response => response.json())
+        .then(data => {
+            const content = document.getElementById('timetable-html');
+            if (data.success) {
+                content.innerHTML = data.html;
+            } else {
+                content.innerHTML = `<h2 style="text-align: center; padding: 50px; color: #888;">${data.error}</h2>`;
+            }
+        })
+        .catch(error => {
+            document.getElementById('timetable-html').innerHTML = 
+                '<h2 style="text-align: center; padding: 50px; color: #888;">Error loading timetable.</h2>';
+        });
+</script>
+{% endif %}
 </body></html>
 """
 
@@ -810,20 +823,6 @@ def faculty_login():
 @app.route('/admin')
 def admin_dashboard():
     return ADMIN_DASHBOARD
-
-@app.route('/generate-exams')
-def generate_exams_route():
-    """
-    Triggers the standalone exam_scheduler_main.py script.
-    """
-    print("\n--- ADMIN: Triggering Exam Scheduler ---")
-    try:
-        # Assumes exam_scheduler_main.py is in the root
-        os.system(f"{sys.executable} exam_scheduler_main.py")
-        return jsonify({'success': True, 'message': 'Exam scheduler script finished. Check console for details.'})
-    except Exception as e:
-        print(f"Error running exam scheduler: {e}")
-        return jsonify({'success': False, 'message': f'Error: {e}'})
 
 @app.route('/student/timetable')
 def student_timetable():
@@ -860,7 +859,6 @@ def download_class_tt():
     """
     if not g_is_generated:
         return "Timetable has not been generated. Please go to /admin and generate.", 400
-        
     try:
         exporter = ExcelExporter(
             all_sections=g_all_sections,
@@ -876,6 +874,33 @@ def download_class_tt():
             dept_buffer,
             as_attachment=True,
             download_name="Department_Timetables.xlsx",
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    except Exception as e:
+        return str(e), 500
+
+@app.route('/download-faculty-tt')
+def download_faculty_tt():
+    """
+    Generates and sends the Faculty_Timetables.xlsx file.
+    """
+    if not g_is_generated:
+        return "Timetable has not been generated. Please go to /admin and generate.", 400
+    try:
+        exporter = ExcelExporter(
+            all_sections=g_all_sections,
+            all_classrooms=g_all_classrooms,
+            all_faculty_schedules=g_all_faculty_schedules
+        )
+        
+        faculty_buffer = io.BytesIO()
+        exporter.export_faculty_timetables(faculty_buffer)
+        faculty_buffer.seek(0)
+        
+        return send_file(
+            faculty_buffer,
+            as_attachment=True,
+            download_name="Faculty_Timetables.xlsx",
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
     except Exception as e:
@@ -897,7 +922,6 @@ def generate():
 def api_section_list():
     if not g_is_generated:
         return jsonify({'sections': []})
-        
     section_ids = sorted(list(set(s.id for s in g_all_sections)))
     return jsonify({'sections': section_ids})
 
@@ -905,7 +929,6 @@ def api_section_list():
 def api_faculty_list():
     if not g_is_generated:
         return jsonify({'faculty': []})
-        
     faculty_names = sorted(list(g_all_faculty_schedules.keys()))
     return jsonify({'faculty': faculty_names})
 
@@ -913,24 +936,25 @@ def api_faculty_list():
 def api_admin_data():
     """Get all system data for admin dashboard."""
     if not g_is_generated:
-        # Load data manually if not generated yet
-        global g_all_classrooms, g_course_db
-        if not g_all_classrooms:
-            g_all_classrooms = load_classrooms("data/classroom_data.csv")
-        if not g_course_db:
-            pre, post = load_and_process_courses("data/courses.csv")
-            for c in pre + post:
-                if c.course_code not in g_course_db:
-                    g_course_db[c.course_code] = c
-
+        # If data hasn't been generated, return empty/zero stats.
+        # The dashboard will show 0s, prompting the admin to run generation.
+        return jsonify({
+            'sections_count': 0,
+            'faculty_count': 0,
+            'rooms_count': 0,
+            'courses': [],
+            'rooms': []
+        })
+    
+    # If we are here, g_is_generated is True and globals are populated
     return jsonify({
         'sections_count': len(g_all_sections),
         'faculty_count': len(g_all_faculty_schedules),
         'rooms_count': len(g_all_classrooms),
         'courses': [
             {'code': c.course_code, 'name': c.course_name, 'dept': c.department, 'pref': c.pre_post_preference}
-            for c in g_course_db.values()
-        ][:100], # Send first 100
+            for c in list(g_course_db.values())[:100]  # Send first 100
+        ],
         'rooms': [
             {'id': r.room_id, 'type': r.room_type, 'capacity': r.capacity}
             for r in g_all_classrooms
@@ -942,9 +966,9 @@ def api_student_timetable():
     section_id = request.args.get('id')
     if not section_id:
         return jsonify({'success': False, 'error': 'No section ID provided.'})
-        
-    section = next((s for s in g_all_sections if s.id == section_id), None)
     
+    section = next((s for s in g_all_sections if s.id == section_id), None)
+
     if not section:
         return jsonify({'success': False, 'error': f'Timetable for "{section_id}" not found.'})
         
@@ -956,9 +980,9 @@ def api_faculty_timetable():
     faculty_name = request.args.get('name')
     if not faculty_name:
         return jsonify({'success': False, 'error': 'No faculty name provided.'})
-        
-    timetable = g_all_faculty_schedules.get(faculty_name)
     
+    timetable = g_all_faculty_schedules.get(faculty_name)
+
     if not timetable:
         return jsonify({'success': False, 'error': f'Timetable for "{faculty_name}" not found.'})
         
@@ -966,14 +990,22 @@ def api_faculty_timetable():
     return jsonify({'success': True, 'html': html})
 
 # --- Main Execution ---
+
 if __name__ == '__main__':
     print("=" * 70)
     print("🌐 Starting Timetable System Web Interface".center(70))
     print("=" * 70)
     
     # Run the scheduler once on startup
-    run_generation_pipeline()
-    
+    print("\n🔄 Running initial timetable generation...")
+    success = run_generation_pipeline()
+
+    if success:
+        print("✅ Initial generation successful!")
+    else:
+        print("⚠️  Initial generation failed. Check error messages above.")
+        print("    You can still access the web interface and generate from Admin panel.")
+
     print("\n📍 Open your browser and visit: http://localhost:5000")
     print("⚡ Press Ctrl+C to stop the server\n")
     app.run(debug=True, port=5000, use_reloader=False)

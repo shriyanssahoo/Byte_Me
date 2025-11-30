@@ -271,4 +271,4 @@ For issues or questions, please open an issue in the repository or contact the d
 
 ---
 
-**Note**: This system is designed specifically for IIIT Dharwad's requirements. Adaptation for other institutions may require modifications to scheduling rules and data formats.
+**Note**: This system is designed specifically for IIIT Dharwad's requirements. Adaptation for other institutions may require modifications to scheduling rules and data formats.   

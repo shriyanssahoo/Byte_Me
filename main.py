@@ -4,6 +4,7 @@ main.py
 Main entry point for the Automated Timetable Scheduler.
 This has been rebuilt to handle Sem 1/3/5 and Sem 7 separately.
 """
+#NEW CODE
 
 import os
 from typing import List, Dict, Set

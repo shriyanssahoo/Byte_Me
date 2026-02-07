@@ -1,6 +1,7 @@
 """
 src/data_loader.py
 (Corrected with Type 1/Type 2 bundling and 'parent_pseudo_name' tagging)
+(FIXED: Semester 1 electives now schedule only 1 session per week)
 """
 
 import csv
@@ -92,6 +93,13 @@ def _bundle_baskets_and_electives(courses: List[Course]) -> List[Course]:
     for key, bundle in elective_bundles.items():
         sem, basket = key
         template = bundle[0]
+        
+        # FIX: Force Semester 1 electives to have only 1 session per week
+        if sem == 1 and basket == "A":
+            ltpsc_str = "1-0-0-0-1"  # This creates 1 tutorial = 1 session/week
+        else:
+            ltpsc_str = template.ltpsc_str
+        
         pseudo_name = f"Elective ({basket})" # This is the name we want to display
         
         pseudo_course = Course(
@@ -99,7 +107,7 @@ def _bundle_baskets_and_electives(courses: List[Course]) -> List[Course]:
             course_name=pseudo_name,
             semester=sem,
             department="ALL_DEPTS",  # Cross-departmental
-            ltpsc_str=template.ltpsc_str,
+            ltpsc_str=ltpsc_str,
             credits=template.credits,
             instructors=["TBD"],
             registered_students=100,

@@ -1,5 +1,6 @@
 """
 src/validators.py
+(ADDED: Room double-booking validation for same period)
 """
 
 from typing import List, Dict, Set
@@ -18,8 +19,9 @@ def validate_all(all_sections: List[Section],
     daily_limit_conflicts = _check_daily_limits(all_sections)
     break_conflicts = _check_student_breaks(all_sections)
     ltpsc_conflicts = _check_ltpsc_fulfillment(all_sections)
+    room_conflicts = _check_room_double_booking(all_sections)  # NEW!
     
-    if not student_conflicts and not faculty_conflicts and not daily_limit_conflicts and not break_conflicts and not ltpsc_conflicts:
+    if not student_conflicts and not faculty_conflicts and not daily_limit_conflicts and not break_conflicts and not ltpsc_conflicts and not room_conflicts:
         print("Validation PASSED: All timetables are conflict-free and LTPSC is fulfilled.")
         return True
     else:
@@ -39,7 +41,69 @@ def validate_all(all_sections: List[Section],
         if ltpsc_conflicts:
             print(f"  Found {len(ltpsc_conflicts)} LTPSC fulfillment errors.")
             for c in ltpsc_conflicts: print(f"    - {c}")
+        if room_conflicts:
+            print(f"  Found {len(room_conflicts)} ROOM DOUBLE-BOOKING conflicts.")
+            for c in room_conflicts: print(f"    - {c}")
         return False
+
+def _check_room_double_booking(all_sections: List[Section]) -> List[str]:
+    """
+    NEW: Checks if any room is double-booked within the same period.
+    This validates that no two sections in the same period use the same room at the same time.
+    """
+    conflicts = []
+    
+    # Build room usage map: {room_id: {(day, slot): [section_ids]}}
+    room_usage: Dict[str, Dict[tuple, List[str]]] = {}
+    
+    for section in all_sections:
+        for day in range(len(utils.DAYS)):
+            for slot in range(utils.TOTAL_SLOTS_PER_DAY):
+                s_class = section.timetable.grid[day][slot]
+                
+                if not s_class or s_class.course.course_code in ["LUNCH", "BREAK"]:
+                    continue
+                
+                # Check if this is the start of a class (not a continuation)
+                is_start = (slot == 0) or (section.timetable.grid[day][slot-1] != s_class)
+                
+                if is_start:
+                    for room_id in s_class.room_ids:
+                        if room_id == "TBD":
+                            continue
+                        
+                        # Initialize room tracking
+                        if room_id not in room_usage:
+                            room_usage[room_id] = {}
+                        
+                        # Get duration of this class
+                        duration = s_class.course.get_session_duration(s_class.session_type)
+                        if duration == 0:
+                            duration = 1
+                        
+                        # Mark all slots this class occupies
+                        for i in range(duration):
+                            slot_key = (day, slot + i)
+                            
+                            if slot_key not in room_usage[room_id]:
+                                room_usage[room_id][slot_key] = []
+                            
+                            room_usage[room_id][slot_key].append(
+                                f"{section.id} ({s_class.course.course_code})"
+                            )
+    
+    # Now check for conflicts
+    for room_id, slot_usage in room_usage.items():
+        for (day, slot), section_list in slot_usage.items():
+            if len(section_list) > 1:
+                time_str = utils.slot_index_to_time_str(slot)
+                day_str = utils.DAYS[day]
+                sections_str = ", ".join(section_list)
+                conflicts.append(
+                    f"Room {room_id} DOUBLE-BOOKED at {day_str} {time_str}: {sections_str}"
+                )
+    
+    return sorted(list(set(conflicts)))
 
 def _check_student_conflicts(all_sections: List[Section]) -> List[str]:
     """
@@ -178,7 +242,7 @@ def _check_ltpsc_fulfillment(all_sections: List[Section]) -> List[str]:
             if len(parts) < 2: continue
             
             course_code = parts[0]
-            session_type = parts[1] # is lowercase
+            session_type = parts[1]
             
             if course_code not in course_session_counts:
                 course_session_counts[course_code] = {}
@@ -188,7 +252,7 @@ def _check_ltpsc_fulfillment(all_sections: List[Section]) -> List[str]:
         for day_grid in section.timetable.grid:
             for slot in day_grid:
                 if slot and slot.course.course_code not in ["LUNCH", "BREAK"]:
-                    if not slot.course.is_pseudo_basket: # Don't check placeholders
+                    if not slot.course.is_pseudo_basket:
                         scheduled_courses[slot.course.course_code] = slot.course
 
         for course_code, course in scheduled_courses.items():

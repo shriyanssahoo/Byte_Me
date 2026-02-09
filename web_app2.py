@@ -1,8 +1,8 @@
 """
 Flask web interface for IIIT Dharwad Timetable System
-Clean, structured, calendar-like interface
+Enhanced with IIIT Dharwad branding and dark mode support
 
-Run: python web_app.py
+Run: python web_app2_enhanced.py
 Visit: http://localhost:5000
 """
 
@@ -39,7 +39,7 @@ g_course_color_map: Dict[str, str] = {}
 g_course_db: Dict[str, Course] = {}
 
 def generate_color_map(sections: List[Section]) -> Dict[str, str]:
-    """Generate subtle color variations for different session types"""
+    """Generate subtle color variations for different courses"""
     course_codes: Set[str] = set()
     for section in sections:
         for day_schedule in section.timetable.grid:
@@ -50,32 +50,54 @@ def generate_color_map(sections: List[Section]) -> Dict[str, str]:
                     else:
                         course_codes.add(slot.course.course_code)
     
-    # Expanded professional color palette with distinct colors (no duplicates)
-    # Each color is carefully chosen to be distinguishable and professional
-    subtle_colors = [
-        'E6F0F8',  # Light blue (IIIT theme)
-        'F3E5F5',  # Light purple
-        'E8F5E9',  # Light green
-        'FFF8E1',  # Light amber
-        'FCE4EC',  # Light pink
-        'E0F2F1',  # Light teal
-        'FFF3E0',  # Light orange
-        'E8EAF6',  # Light indigo
-        'F1F8E9',  # Light lime
-        'FBE9E7',  # Light deep orange
-        'F3E5F5',  # Light deep purple
-        'E0F7FA',  # Light cyan
-        'FFFDE7',  # Light yellow
-        'EFEBE9',  # Light brown
-        'ECEFF1',  # Light blue grey
+    # Professional color palette matching IIIT Dharwad theme
+    light_colors = [
+        'E3F2FD',  # Light Blue (primary)
+        'F3E5F5',  # Light Purple
+        'E8F5E9',  # Light Green
+        'FFF3E0',  # Light Orange
+        'FCE4EC',  # Light Pink
+        'E0F2F1',  # Light Teal
+        'FFF8E1',  # Light Amber
+        'E8EAF6',  # Light Indigo
+        'F1F8E9',  # Light Lime
+        'FBE9E7',  # Light Deep Orange
+        'EDE7F6',  # Light Deep Purple
+        'E0F7FA',  # Light Cyan
+        'FFFDE7',  # Light Yellow
+        'EFEBE9',  # Light Brown
+        'ECEFF1',  # Light Blue Grey
+    ]
+    
+    # Dark mode variants
+    dark_colors = [
+        '1E3A5F',  # Dark Blue
+        '4A148C',  # Dark Purple
+        '1B5E20',  # Dark Green
+        'E65100',  # Dark Orange
+        '880E4F',  # Dark Pink
+        '004D40',  # Dark Teal
+        'FF6F00',  # Dark Amber
+        '1A237E',  # Dark Indigo
+        '33691E',  # Dark Lime
+        'BF360C',  # Dark Deep Orange
+        '311B92',  # Dark Deep Purple
+        '006064',  # Dark Cyan
+        'F57F17',  # Dark Yellow
+        '3E2723',  # Dark Brown
+        '263238',  # Dark Blue Grey
     ]
     
     color_map = {}
     for i, code in enumerate(sorted(course_codes)):
-        color_map[code] = subtle_colors[i % len(subtle_colors)]
+        idx = i % len(light_colors)
+        color_map[code] = {
+            'light': light_colors[idx],
+            'dark': dark_colors[idx]
+        }
     
-    color_map["LUNCH"] = "FFF9C4"
-    color_map["BREAK"] = "FAFAFA"
+    color_map["LUNCH"] = {'light': 'FFF9C4', 'dark': '827717'}
+    color_map["BREAK"] = {'light': 'FAFAFA', 'dark': '424242'}
     return color_map
 
 def create_sections(semester: int, period: str) -> List[Section]:
@@ -187,59 +209,47 @@ def _build_timetable_html(timetable: Timetable, view_type: str = 'section') -> s
     html = '<table class="timetable-grid">'
     html += '<thead><tr><th class="sticky-corner">Time / Day</th>'
     
-    # Days header
     for day_name in utils.DAYS:
         html += f'<th class="day-header">{day_name}</th>'
     html += '</tr></thead><tbody>'
     
-    # Time slots
     time_slots = utils.get_time_slots_list()
-    
-    # Track which cells have been rendered (day_idx, slot_idx) to handle rowspan
     rendered = set()
     
     for slot_idx, time_str in enumerate(time_slots):
         html += f'<tr><td class="time-cell">{time_str}</td>'
         
         for day_idx in range(len(utils.DAYS)):
-            # Skip if this cell was already rendered as part of a rowspan
             if (day_idx, slot_idx) in rendered:
                 continue
             
             s_class = timetable.grid[day_idx][slot_idx]
             
             if not s_class:
-                # Count consecutive empty slots
                 rowspan = 1
                 while (slot_idx + rowspan < utils.TOTAL_SLOTS_PER_DAY and 
                        timetable.grid[day_idx][slot_idx + rowspan] is None):
                     rendered.add((day_idx, slot_idx + rowspan))
                     rowspan += 1
-                
                 html += f'<td class="empty-cell" rowspan="{rowspan}"></td>'
             
             elif s_class.course.course_code == "LUNCH":
-                # Count lunch duration
                 rowspan = 1
                 while (slot_idx + rowspan < utils.TOTAL_SLOTS_PER_DAY and 
                        timetable.grid[day_idx][slot_idx + rowspan] == s_class):
                     rendered.add((day_idx, slot_idx + rowspan))
                     rowspan += 1
-                
-                html += f'<td class="lunch-cell" rowspan="{rowspan}"><div class="cell-content">Lunch Break</div></td>'
+                html += f'<td class="lunch-cell" rowspan="{rowspan}"><div class="cell-content"><span class="lunch-icon">🍽️</span> Lunch Break</div></td>'
             
             elif s_class.course.course_code == "BREAK":
-                # Count break duration
                 rowspan = 1
                 while (slot_idx + rowspan < utils.TOTAL_SLOTS_PER_DAY and 
                        timetable.grid[day_idx][slot_idx + rowspan] == s_class):
                     rendered.add((day_idx, slot_idx + rowspan))
                     rowspan += 1
-                
                 html += f'<td class="break-cell" rowspan="{rowspan}"></td>'
             
             else:
-                # Count class duration
                 rowspan = 1
                 while (slot_idx + rowspan < utils.TOTAL_SLOTS_PER_DAY and 
                        timetable.grid[day_idx][slot_idx + rowspan] == s_class):
@@ -250,23 +260,32 @@ def _build_timetable_html(timetable: Timetable, view_type: str = 'section') -> s
                 session_type = s_class.session_type.lower()
                 
                 color_key = s_class.course.parent_pseudo_name if s_class.course.parent_pseudo_name else s_class.course.course_code
-                color = g_course_color_map.get(color_key, "E6F0F8")
+                colors = g_course_color_map.get(color_key, {'light': 'E3F2FD', 'dark': '1E3A5F'})
                 
-                # Build tooltip data
+                # Session type icons
+                session_icons = {
+                    'lecture': '📖',
+                    'tutorial': '✏️',
+                    'practical': '🔬'
+                }
+                icon = session_icons.get(session_type, '📚')
+                
                 if view_type == 'section':
                     instructors = ", ".join(s_class.instructors) if s_class.instructors else "TBD"
                     rooms = ", ".join(s_class.room_ids) if s_class.room_ids else "TBD"
-                    detail_html = f'<div class="cell-detail">{instructors}</div><div class="cell-detail">{rooms}</div>'
-                    tooltip_info = f"{course_name}|||{session_type.capitalize()}|||Instructor: {instructors}|||Room: {rooms}"
+                    detail_html = f'<div class="cell-detail"><span class="detail-icon">👨‍🏫</span> {instructors}</div><div class="cell-detail"><span class="detail-icon">🏫</span> {rooms}</div>'
+                    tooltip_info = f"{course_name}|||{icon} {session_type.capitalize()}|||👨‍🏫 Instructor: {instructors}|||🏫 Room: {rooms}"
                 else:
                     section = s_class.section_id
                     rooms = ", ".join(s_class.room_ids) if s_class.room_ids else "TBD"
-                    detail_html = f'<div class="cell-detail">{section}</div><div class="cell-detail">{rooms}</div>'
-                    tooltip_info = f"{course_name}|||{session_type.capitalize()}|||Section: {section}|||Room: {rooms}"
+                    detail_html = f'<div class="cell-detail"><span class="detail-icon">👥</span> {section}</div><div class="cell-detail"><span class="detail-icon">🏫</span> {rooms}</div>'
+                    tooltip_info = f"{course_name}|||{icon} {session_type.capitalize()}|||👥 Section: {section}|||🏫 Room: {rooms}"
                 
-                html += f'<td class="class-cell" rowspan="{rowspan}" style="background-color: #{color}" '
-                html += f'data-type="{session_type}" data-tooltip="{tooltip_info}">'
+                html += f'<td class="class-cell" rowspan="{rowspan}" '
+                html += f'data-type="{session_type}" data-light-color="{colors["light"]}" data-dark-color="{colors["dark"]}" '
+                html += f'data-tooltip="{tooltip_info}">'
                 html += f'<div class="cell-content">'
+                html += f'<div class="session-badge"><span class="badge-icon">{icon}</span> {session_type.capitalize()}</div>'
                 html += f'<div class="course-name">{course_name}</div>'
                 html += detail_html
                 html += '</div></td>'
@@ -276,31 +295,102 @@ def _build_timetable_html(timetable: Timetable, view_type: str = 'section') -> s
     html += '</tbody></table>'
     return html
 
-# HTML and CSS
+# HTML and CSS with IIIT Dharwad theme and dark mode
 MAIN_HTML = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IIIT Dharwad Timetable</title>
+    <title>IIIT Dharwad Timetable System</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f8f9fa;
-            color: #212529;
+        :root {
+            /* IIIT Dharwad Brand Colors - Light Mode */
+            --primary-color: #1976D2;
+            --primary-dark: #0D47A1;
+            --primary-light: #BBDEFB;
+            --accent-color: #FF6F00;
+            --accent-light: #FFE0B2;
+            
+            /* Light Mode Colors */
+            --bg-primary: #FAFAFA;
+            --bg-secondary: #FFFFFF;
+            --bg-tertiary: #F5F5F5;
+            --text-primary: #212121;
+            --text-secondary: #757575;
+            --text-tertiary: #9E9E9E;
+            --border-color: #E0E0E0;
+            --border-hover: #BDBDBD;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.12);
+            --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
+            --shadow-lg: 0 10px 25px rgba(0,0,0,0.15);
+            
+            /* Table Colors */
+            --table-header: #E3F2FD;
+            --table-border: #BDBDBD;
+            --empty-cell: #FAFAFA;
+            --break-cell: #F5F5F5;
+            --lunch-bg: #FFF9C4;
+            --lunch-text: #F57F17;
+            
+            /* Session Type Colors */
+            --lecture-accent: #1976D2;
+            --tutorial-accent: #7B1FA2;
+            --practical-accent: #388E3C;
         }
         
-        /* Header */
+        [data-theme="dark"] {
+            /* Dark Mode Colors */
+            --bg-primary: #121212;
+            --bg-secondary: #1E1E1E;
+            --bg-tertiary: #2C2C2C;
+            --text-primary: #E0E0E0;
+            --text-secondary: #B0B0B0;
+            --text-tertiary: #808080;
+            --border-color: #3A3A3A;
+            --border-hover: #505050;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+            --shadow-md: 0 4px 6px rgba(0,0,0,0.4);
+            --shadow-lg: 0 10px 25px rgba(0,0,0,0.5);
+            
+            /* Dark Table Colors */
+            --table-header: #1E3A5F;
+            --table-border: #3A3A3A;
+            --empty-cell: #1A1A1A;
+            --break-cell: #242424;
+            --lunch-bg: #4A4A2E;
+            --lunch-text: #FFD54F;
+            
+            /* Dark Session Colors */
+            --lecture-accent: #42A5F5;
+            --tutorial-accent: #AB47BC;
+            --practical-accent: #66BB6A;
+        }
+        
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        
+        /* Header with IIIT Branding */
         .header {
-            background: white;
-            border-bottom: 1px solid #dee2e6;
+            background: var(--bg-secondary);
+            border-bottom: 3px solid var(--primary-color);
             padding: 16px 24px;
             position: sticky;
             top: 0;
             z-index: 100;
+            box-shadow: var(--shadow-md);
+            transition: all 0.3s ease;
         }
         
         .header-content {
@@ -309,40 +399,93 @@ MAIN_HTML = """
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 20px;
+        }
+        
+        .brand-section {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .logo {
+            font-size: 32px;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+        }
+        
+        .institute-info {
+            display: flex;
+            flex-direction: column;
         }
         
         .institute-name {
-            font-size: 18px;
-            font-weight: 600;
-            color: #212529;
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--primary-color);
+            letter-spacing: -0.5px;
+        }
+        
+        .system-subtitle {
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 16px;
         }
         
         .view-selector {
             display: flex;
             gap: 0;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
+            border: 2px solid var(--primary-color);
+            border-radius: 6px;
             overflow: hidden;
+            background: var(--bg-secondary);
         }
         
         .view-btn {
-            padding: 8px 20px;
+            padding: 10px 24px;
             border: none;
-            background: white;
+            background: var(--bg-secondary);
             cursor: pointer;
             font-size: 14px;
-            color: #495057;
-            border-right: 1px solid #dee2e6;
-            transition: all 0.15s;
+            font-weight: 600;
+            color: var(--text-primary);
+            border-right: 1px solid var(--primary-light);
+            transition: all 0.2s;
         }
         
         .view-btn:last-child { border-right: none; }
-        
-        .view-btn:hover { background: #f8f9fa; }
-        
+        .view-btn:hover { background: var(--primary-light); }
         .view-btn.active {
-            background: #004B87;
+            background: var(--primary-color);
             color: white;
+        }
+        
+        /* Theme Toggle Button */
+        .theme-toggle {
+            background: var(--bg-tertiary);
+            border: 2px solid var(--border-color);
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 20px;
+            transition: all 0.3s;
+        }
+        
+        .theme-toggle:hover {
+            background: var(--primary-light);
+            border-color: var(--primary-color);
+            transform: rotate(180deg);
         }
         
         /* Main Layout */
@@ -350,42 +493,49 @@ MAIN_HTML = """
             max-width: 1600px;
             margin: 0 auto;
             display: flex;
-            height: calc(100vh - 65px);
+            height: calc(100vh - 85px);
         }
         
-        /* Sidebar */
+        /* Enhanced Sidebar */
         .sidebar {
-            width: 280px;
-            background: white;
-            border-right: 1px solid #dee2e6;
+            width: 300px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
             overflow-y: auto;
             flex-shrink: 0;
+            box-shadow: var(--shadow-sm);
         }
         
         .sidebar-section {
-            padding: 20px;
-            border-bottom: 1px solid #f1f3f5;
+            padding: 24px;
+            border-bottom: 1px solid var(--border-color);
         }
         
         .sidebar-title {
             font-size: 11px;
-            font-weight: 600;
+            font-weight: 700;
             text-transform: uppercase;
-            color: #868e96;
-            margin-bottom: 12px;
-            letter-spacing: 0.5px;
+            color: var(--primary-color);
+            margin-bottom: 16px;
+            letter-spacing: 1px;
         }
         
         .search-box {
             width: 100%;
-            padding: 8px 12px;
-            border: 1px solid #ced4da;
-            border-radius: 4px;
+            padding: 12px 16px;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
             font-size: 14px;
             outline: none;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            transition: all 0.2s;
         }
         
-        .search-box:focus { border-color: #004B87; }
+        .search-box:focus { 
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
+        }
         
         .filter-list {
             list-style: none;
@@ -394,34 +544,48 @@ MAIN_HTML = """
         }
         
         .filter-item {
-            padding: 10px 12px;
-            margin: 2px 0;
-            border-radius: 4px;
+            padding: 12px 16px;
+            margin: 4px 0;
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 13px;
-            color: #495057;
-            transition: background 0.1s;
+            font-size: 14px;
+            color: var(--text-primary);
+            transition: all 0.2s;
+            border: 2px solid transparent;
         }
         
-        .filter-item:hover { background: #f8f9fa; }
+        .filter-item:hover { 
+            background: var(--bg-tertiary);
+            border-color: var(--border-hover);
+        }
         
         .filter-item.selected {
-            background: #E6F0F8;
-            color: #004B87;
-            font-weight: 500;
+            background: var(--primary-light);
+            color: var(--primary-dark);
+            font-weight: 600;
+            border-color: var(--primary-color);
         }
         
         .filter-checkbox {
             display: flex;
             align-items: center;
-            padding: 8px 0;
+            padding: 10px 0;
             cursor: pointer;
-            font-size: 13px;
-            color: #495057;
+            font-size: 14px;
+            color: var(--text-primary);
+            transition: color 0.2s;
+        }
+        
+        .filter-checkbox:hover {
+            color: var(--primary-color);
         }
         
         .filter-checkbox input {
-            margin-right: 8px;
+            margin-right: 12px;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: var(--primary-color);
         }
         
         /* Main Area */
@@ -429,38 +593,44 @@ MAIN_HTML = """
             flex: 1;
             display: flex;
             flex-direction: column;
-            background: white;
+            background: var(--bg-secondary);
         }
         
         .timetable-header {
-            padding: 20px 24px;
-            border-bottom: 1px solid #dee2e6;
+            padding: 24px 28px;
+            border-bottom: 2px solid var(--border-color);
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
         }
         
         .timetable-title {
-            font-size: 20px;
-            font-weight: 600;
-            color: #212529;
-            margin-bottom: 4px;
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 6px;
         }
         
         .timetable-subtitle {
             font-size: 14px;
-            color: #6c757d;
+            color: var(--text-secondary);
+            font-weight: 500;
         }
         
         .timetable-container {
             flex: 1;
             overflow: auto;
-            padding: 24px;
+            padding: 28px;
+            background: var(--bg-primary);
         }
         
-        /* Timetable Grid */
+        /* Enhanced Timetable Grid */
         .timetable-grid {
             width: 100%;
             border-collapse: separate;
             border-spacing: 0;
             font-size: 13px;
+            box-shadow: var(--shadow-lg);
+            border-radius: 12px;
+            overflow: hidden;
         }
         
         .timetable-grid thead {
@@ -473,170 +643,217 @@ MAIN_HTML = """
             position: sticky;
             left: 0;
             z-index: 20;
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            padding: 12px;
-            font-weight: 600;
-            font-size: 12px;
-            color: #495057;
-            min-width: 100px;
+            background: var(--table-header);
+            border: 1px solid var(--table-border);
+            padding: 14px;
+            font-weight: 700;
+            font-size: 13px;
+            color: var(--primary-dark);
+            min-width: 110px;
         }
         
         .day-header {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            padding: 12px;
-            font-weight: 600;
-            font-size: 13px;
-            color: #212529;
+            background: var(--table-header);
+            border: 1px solid var(--table-border);
+            padding: 14px;
+            font-weight: 700;
+            font-size: 14px;
+            color: var(--primary-dark);
             text-align: center;
-            min-width: 180px;
-            width: 180px;
+            min-width: 200px;
+            width: 200px;
         }
         
         .time-cell {
             position: sticky;
             left: 0;
             z-index: 5;
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            padding: 8px;
+            background: var(--table-header);
+            border: 1px solid var(--table-border);
+            padding: 10px;
             font-size: 11px;
-            color: #6c757d;
+            color: var(--text-secondary);
             text-align: center;
-            min-width: 100px;
-            font-weight: 500;
+            min-width: 110px;
+            font-weight: 600;
         }
         
         .timetable-grid td {
-            border: 1px solid #dee2e6;
+            border: 1px solid var(--table-border);
             vertical-align: top;
-            min-height: 60px;
-            min-width: 180px;
+            min-height: 70px;
+            min-width: 200px;
         }
         
         .empty-cell {
-            background: #fafbfc;
+            background: var(--empty-cell);
         }
         
         .break-cell {
-            background: #f8f9fa;
+            background: var(--break-cell);
             border-style: dashed;
-            border-color: #ced4da;
+            border-color: var(--border-hover);
         }
         
         .lunch-cell {
-            background: #fff9db;
+            background: var(--lunch-bg);
             text-align: center;
             vertical-align: middle;
-            font-weight: 500;
-            color: #856404;
-            border-color: #ffeaa7;
+            font-weight: 600;
+            color: var(--lunch-text);
+            font-size: 14px;
+        }
+        
+        .lunch-icon {
+            font-size: 20px;
+            margin-right: 6px;
         }
         
         .class-cell {
             cursor: pointer;
             position: relative;
-            transition: box-shadow 0.1s;
+            transition: all 0.2s;
         }
         
         .class-cell:hover {
-            box-shadow: inset 0 0 0 2px #004B87;
+            box-shadow: inset 0 0 0 3px var(--primary-color);
             z-index: 3;
+            transform: scale(1.02);
         }
         
-        .class-cell[data-type="lecture"] { border-left: 3px solid #004B87; }
-        .class-cell[data-type="tutorial"] { border-left: 3px solid #6f42c1; }
-        .class-cell[data-type="practical"] { border-left: 3px solid #198754; }
+        .class-cell[data-type="lecture"] { border-left: 4px solid var(--lecture-accent); }
+        .class-cell[data-type="tutorial"] { border-left: 4px solid var(--tutorial-accent); }
+        .class-cell[data-type="practical"] { border-left: 4px solid var(--practical-accent); }
         
         .cell-content {
-            padding: 10px;
+            padding: 12px;
+        }
+        
+        .session-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .class-cell[data-type="lecture"] .session-badge {
+            background: rgba(25, 118, 210, 0.15);
+            color: var(--lecture-accent);
+        }
+        
+        .class-cell[data-type="tutorial"] .session-badge {
+            background: rgba(123, 31, 162, 0.15);
+            color: var(--tutorial-accent);
+        }
+        
+        .class-cell[data-type="practical"] .session-badge {
+            background: rgba(56, 142, 60, 0.15);
+            color: var(--practical-accent);
+        }
+        
+        .badge-icon {
+            font-size: 13px;
+            margin-right: 4px;
         }
         
         .course-name {
-            font-weight: 600;
-            font-size: 13px;
-            color: #212529;
-            margin-bottom: 6px;
-            line-height: 1.3;
+            font-weight: 700;
+            font-size: 14px;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+            line-height: 1.4;
         }
         
         .cell-detail {
-            font-size: 11px;
-            color: #6c757d;
-            line-height: 1.4;
-            margin-top: 2px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-top: 4px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .detail-icon {
+            margin-right: 6px;
+            font-size: 13px;
         }
         
         /* Tooltip */
         #tooltip {
             position: fixed;
-            background: rgba(33, 37, 41, 0.95);
+            background: rgba(33, 37, 41, 0.97);
             color: white;
-            padding: 12px 16px;
-            border-radius: 6px;
-            font-size: 12px;
+            padding: 16px 20px;
+            border-radius: 10px;
+            font-size: 13px;
             pointer-events: none;
             z-index: 1000;
-            max-width: 280px;
+            max-width: 320px;
             display: none;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+            border: 2px solid var(--primary-color);
         }
         
         .tooltip-line {
-            margin: 4px 0;
-            line-height: 1.5;
-        }
-        
-        .tooltip-line strong {
-            color: #adb5bd;
-            font-weight: 500;
+            margin: 6px 0;
+            line-height: 1.6;
         }
         
         /* Action Bar */
         .action-bar {
-            padding: 16px 24px;
-            border-top: 1px solid #dee2e6;
-            background: #f8f9fa;
+            padding: 20px 28px;
+            border-top: 2px solid var(--border-color);
+            background: var(--bg-tertiary);
             display: flex;
             gap: 12px;
             justify-content: flex-end;
         }
         
         .btn {
-            padding: 8px 16px;
-            border: 1px solid #ced4da;
-            background: white;
-            border-radius: 4px;
-            font-size: 13px;
+            padding: 12px 24px;
+            border: 2px solid var(--border-color);
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
             cursor: pointer;
-            color: #495057;
-            transition: all 0.15s;
+            color: var(--text-primary);
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
         
         .btn:hover {
-            background: #e9ecef;
-            border-color: #adb5bd;
+            background: var(--bg-tertiary);
+            border-color: var(--primary-color);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
         }
         
         .btn-primary {
-            background: #004B87;
+            background: var(--primary-color);
             color: white;
-            border-color: #004B87;
+            border-color: var(--primary-color);
         }
         
         .btn-primary:hover {
-            background: #003A6B;
-            border-color: #003A6B;
+            background: var(--primary-dark);
+            border-color: var(--primary-dark);
         }
         
         .loading-state {
             text-align: center;
-            padding: 60px 20px;
-            color: #6c757d;
+            padding: 80px 20px;
+            color: var(--text-secondary);
+            font-size: 16px;
         }
         
-        /* Modal for detailed view */
+        /* Modal */
         .modal {
             display: none;
             position: fixed;
@@ -645,29 +862,31 @@ MAIN_HTML = """
             top: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0,0,0,0.5);
+            background-color: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
         }
         
         .modal-content {
-            background-color: white;
-            margin: 10% auto;
-            padding: 32px;
-            border-radius: 8px;
-            width: 500px;
+            background-color: var(--bg-secondary);
+            margin: 8% auto;
+            padding: 36px;
+            border-radius: 16px;
+            width: 560px;
             max-width: 90%;
-            box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            border: 2px solid var(--primary-color);
         }
         
         .modal-header {
-            font-size: 20px;
-            font-weight: 600;
-            margin-bottom: 20px;
-            color: #212529;
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 24px;
+            color: var(--primary-color);
         }
         
         .modal-row {
-            padding: 12px 0;
-            border-bottom: 1px solid #f1f3f5;
+            padding: 14px 0;
+            border-bottom: 1px solid var(--border-color);
         }
         
         .modal-row:last-child {
@@ -677,38 +896,70 @@ MAIN_HTML = """
         .modal-label {
             font-size: 11px;
             text-transform: uppercase;
-            color: #868e96;
-            margin-bottom: 4px;
-            letter-spacing: 0.5px;
+            color: var(--text-tertiary);
+            margin-bottom: 6px;
+            letter-spacing: 0.8px;
+            font-weight: 600;
         }
         
         .modal-value {
-            font-size: 14px;
-            color: #212529;
-            font-weight: 500;
+            font-size: 15px;
+            color: var(--text-primary);
+            font-weight: 600;
         }
         
         .close {
             float: right;
-            font-size: 28px;
+            font-size: 32px;
             font-weight: bold;
-            color: #adb5bd;
+            color: var(--text-tertiary);
             cursor: pointer;
             line-height: 20px;
+            transition: color 0.2s;
         }
         
         .close:hover {
-            color: #212529;
+            color: var(--accent-color);
+        }
+        
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: var(--bg-tertiary);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-hover);
+            border-radius: 5px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-color);
         }
     </style>
 </head>
-<body>
+<body data-theme="light">
     <div class="header">
         <div class="header-content">
-            <div class="institute-name">IIIT Dharwad Timetable</div>
-            <div class="view-selector">
-                <button class="view-btn active" data-view="class">Class-wise</button>
-                <button class="view-btn" data-view="faculty">Faculty-wise</button>
+            <div class="brand-section">
+                <div class="logo">🎓</div>
+                <div class="institute-info">
+                    <div class="institute-name">IIIT Dharwad</div>
+                    <div class="system-subtitle">Automated Timetable System</div>
+                </div>
+            </div>
+            <div class="header-controls">
+                <div class="view-selector">
+                    <button class="view-btn active" data-view="class">📚 Class-wise</button>
+                    <button class="view-btn" data-view="faculty">👨‍🏫 Faculty-wise</button>
+                </div>
+                <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode">
+                    <span class="theme-icon">🌙</span>
+                </button>
             </div>
         </div>
     </div>
@@ -716,27 +967,27 @@ MAIN_HTML = """
     <div class="main-container">
         <div class="sidebar">
             <div class="sidebar-section">
-                <div class="sidebar-title">Search</div>
+                <div class="sidebar-title">🔍 Search</div>
                 <input type="text" class="search-box" id="searchBox" placeholder="Search...">
             </div>
             
             <div class="sidebar-section">
-                <div class="sidebar-title" id="sidebarTitle">Sections</div>
+                <div class="sidebar-title" id="sidebarTitle">📋 Sections</div>
                 <ul class="filter-list" id="filterList">
                     <li class="loading-state">Loading...</li>
                 </ul>
             </div>
             
             <div class="sidebar-section">
-                <div class="sidebar-title">Show/Hide</div>
+                <div class="sidebar-title">👁️ Show/Hide</div>
                 <label class="filter-checkbox">
-                    <input type="checkbox" checked data-filter-type="lecture"> Lectures
+                    <input type="checkbox" checked data-filter-type="lecture"> 📖 Lectures
                 </label>
                 <label class="filter-checkbox">
-                    <input type="checkbox" checked data-filter-type="tutorial"> Tutorials
+                    <input type="checkbox" checked data-filter-type="tutorial"> ✏️ Tutorials
                 </label>
                 <label class="filter-checkbox">
-                    <input type="checkbox" checked data-filter-type="practical"> Practicals
+                    <input type="checkbox" checked data-filter-type="practical"> 🔬 Practicals
                 </label>
             </div>
         </div>
@@ -748,20 +999,25 @@ MAIN_HTML = """
             </div>
             
             <div class="timetable-container" id="timetableContainer">
-                <div class="loading-state">No timetable selected</div>
+                <div class="loading-state">📅 No timetable selected</div>
             </div>
             
             <div class="action-bar">
-                <button class="btn" onclick="downloadClassTT()">Download Class Timetables</button>
-                <button class="btn" onclick="downloadFacultyTT()">Download Faculty Timetables</button>
-                <button class="btn btn-primary" onclick="regenerate()">Regenerate</button>
+                <button class="btn" onclick="downloadClassTT()">
+                    <span>📥</span> Download Class Timetables
+                </button>
+                <button class="btn" onclick="downloadFacultyTT()">
+                    <span>📥</span> Download Faculty Timetables
+                </button>
+                <button class="btn btn-primary" onclick="regenerate()">
+                    <span>🔄</span> Regenerate
+                </button>
             </div>
         </div>
     </div>
     
     <div id="tooltip"></div>
     
-    <!-- Modal for detailed view -->
     <div id="detailModal" class="modal">
         <div class="modal-content">
             <span class="close">&times;</span>
@@ -774,6 +1030,35 @@ MAIN_HTML = """
         let currentView = 'class';
         let allData = [];
         let selectedId = null;
+        
+        // Theme Management
+        function toggleTheme() {
+            const body = document.body;
+            const currentTheme = body.getAttribute('data-theme');
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            body.setAttribute('data-theme', newTheme);
+            
+            const themeIcon = document.querySelector('.theme-icon');
+            themeIcon.textContent = newTheme === 'light' ? '🌙' : '☀️';
+            
+            localStorage.setItem('theme', newTheme);
+            updateCellColors();
+        }
+        
+        // Load saved theme
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.body.setAttribute('data-theme', savedTheme);
+        document.querySelector('.theme-icon').textContent = savedTheme === 'light' ? '🌙' : '☀️';
+        
+        // Update cell colors based on theme
+        function updateCellColors() {
+            const theme = document.body.getAttribute('data-theme');
+            document.querySelectorAll('.class-cell').forEach(cell => {
+                const lightColor = cell.getAttribute('data-light-color');
+                const darkColor = cell.getAttribute('data-dark-color');
+                cell.style.backgroundColor = theme === 'light' ? '#' + lightColor : '#' + darkColor;
+            });
+        }
         
         // View switcher
         document.querySelectorAll('.view-btn').forEach(btn => {
@@ -789,14 +1074,12 @@ MAIN_HTML = """
         function loadData() {
             const endpoints = {
                 'class': '/api/section-list',
-                'faculty': '/api/faculty-list',
-                'room': '/api/room-list'
+                'faculty': '/api/faculty-list'
             };
             
             const titles = {
-                'class': 'Sections',
-                'faculty': 'Faculty',
-                'room': 'Rooms'
+                'class': '📋 Sections',
+                'faculty': '👨‍🏫 Faculty'
             };
             
             document.getElementById('sidebarTitle').textContent = titles[currentView];
@@ -805,7 +1088,7 @@ MAIN_HTML = """
             fetch(endpoints[currentView])
                 .then(r => r.json())
                 .then(data => {
-                    allData = data.sections || data.faculty || data.rooms || [];
+                    allData = data.sections || data.faculty || [];
                     renderList(allData);
                 });
         }
@@ -836,15 +1119,12 @@ MAIN_HTML = """
         function loadTimetable(id) {
             const endpoints = {
                 'class': '/api/student-timetable?id=',
-                'faculty': '/api/faculty-timetable?name=',
-                'room': '/api/room-timetable?id='
+                'faculty': '/api/faculty-timetable?name='
             };
             
             document.getElementById('timetableTitle').textContent = id;
             document.getElementById('timetableSubtitle').textContent = 
-                currentView === 'class' ? 'Class Schedule' : 
-                currentView === 'faculty' ? 'Teaching Schedule' : 
-                'Room Bookings';
+                currentView === 'class' ? 'Class Schedule' : 'Teaching Schedule';
             
             document.getElementById('timetableContainer').innerHTML = '<div class="loading-state">Loading...</div>';
             
@@ -853,6 +1133,7 @@ MAIN_HTML = """
                 .then(data => {
                     if (data.success) {
                         document.getElementById('timetableContainer').innerHTML = data.html;
+                        updateCellColors();
                         setupInteractivity();
                     } else {
                         document.getElementById('timetableContainer').innerHTML = 
@@ -868,7 +1149,6 @@ MAIN_HTML = """
             const cells = document.querySelectorAll('.class-cell[data-tooltip]');
             
             cells.forEach(cell => {
-                // Tooltip on hover
                 cell.addEventListener('mouseenter', function(e) {
                     const parts = this.dataset.tooltip.split('|||');
                     tooltip.innerHTML = parts.map(p => `<div class="tooltip-line">${p}</div>`).join('');
@@ -884,7 +1164,6 @@ MAIN_HTML = """
                     tooltip.style.display = 'none';
                 });
                 
-                // Modal on click
                 cell.addEventListener('click', function() {
                     const parts = this.dataset.tooltip.split('|||');
                     document.getElementById('modalHeader').textContent = parts[0];
@@ -899,7 +1178,6 @@ MAIN_HTML = """
                 });
             });
             
-            // Apply filters
             applyFilters();
         }
         
@@ -954,10 +1232,10 @@ MAIN_HTML = """
                     .then(r => r.json())
                     .then(data => {
                         if (data.success) {
-                            alert('Timetables regenerated successfully!');
+                            alert('✅ Timetables regenerated successfully!');
                             location.reload();
                         } else {
-                            alert('Error: ' + data.error);
+                            alert('❌ Error: ' + data.error);
                         }
                     });
             }
@@ -970,7 +1248,7 @@ MAIN_HTML = """
 </html>
 """
 
-# Routes
+# Routes (same as before)
 @app.route('/')
 def index():
     return MAIN_HTML
@@ -997,12 +1275,6 @@ def api_faculty_list():
     faculty_names = sorted(list(g_all_faculty_schedules.keys()))
     return jsonify({'faculty': faculty_names})
 
-@app.route('/api/room-list')
-def api_room_list():
-    if not g_is_generated:
-        return jsonify({'rooms': []})
-    return jsonify({'rooms': []})  # Room view not implemented
-
 @app.route('/api/student-timetable')
 def api_student_timetable():
     section_id = request.args.get('id')
@@ -1028,10 +1300,6 @@ def api_faculty_timetable():
     
     html = _build_timetable_html(timetable, view_type='faculty')
     return jsonify({'success': True, 'html': html})
-
-@app.route('/api/room-timetable')
-def api_room_timetable():
-    return jsonify({'success': False, 'error': 'Room view not implemented'})
 
 @app.route('/download-class-tt')
 def download_class_tt():
@@ -1063,8 +1331,13 @@ def download_faculty_tt():
 
 if __name__ == '__main__':
     print("\n" + "="*70)
-    print("IIIT Dharwad Timetable System".center(70))
+    print("IIIT Dharwad Timetable System - Enhanced Edition".center(70))
     print("="*70)
+    print("\n🎨 Features:")
+    print("  • IIIT Dharwad branded theme")
+    print("  • Dark mode support")
+    print("  • Enhanced visual design")
+    print("  • Session type badges with icons")
     print("\nGenerating timetables...")
     
     success = run_generation_pipeline()
@@ -1073,7 +1346,8 @@ if __name__ == '__main__':
     else:
         print("✗ Generation failed")
     
-    print("\nServer starting at: http://localhost:5000")
-    print("Press Ctrl+C to stop\n")
+    print("\n🌐 Server starting at: http://localhost:5000")
+    print("🌙 Click the moon icon to toggle dark mode")
+    print("⌨️  Press Ctrl+C to stop\n")
     
     app.run(debug=True, port=5000, use_reloader=False)

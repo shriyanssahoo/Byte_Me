@@ -35,10 +35,10 @@ g_is_generated: bool = False
 g_all_sections: List[Section] = []
 g_all_faculty_schedules: Dict[str, Timetable] = {}
 g_all_classrooms: List[Classroom] = []
-g_course_color_map: Dict[str, str] = {}
+g_course_color_map: Dict[str, Dict[str, str]] = {}
 g_course_db: Dict[str, Course] = {}
 
-def generate_color_map(sections: List[Section]) -> Dict[str, str]:
+def generate_color_map(sections: List[Section]) -> Dict[str, Dict[str, str]]:
     """Generate subtle color variations for different courses"""
     course_codes: Set[str] = set()
     for section in sections:
@@ -260,7 +260,7 @@ def _build_timetable_html(timetable: Timetable, view_type: str = 'section') -> s
                 session_type = s_class.session_type.lower()
                 
                 color_key = s_class.course.parent_pseudo_name if s_class.course.parent_pseudo_name else s_class.course.course_code
-                colors = g_course_color_map.get(color_key, {'light': 'E3F2FD', 'dark': '1E3A5F'})
+                colors: Dict[str, str] = g_course_color_map.get(color_key, {'light': 'E3F2FD', 'dark': '1E3A5F'})
                 
                 # Session type icons
                 session_icons = {

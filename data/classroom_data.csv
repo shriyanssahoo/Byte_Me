@@ -1,30 +1,30 @@
 Room Number,Type,Capacity,Facilities
-C002,Classroom,116,Projector
-C003,Classroom,135,Projector
+C002,Classroom,140,Projector
+C003,Classroom,140,Projector
 C004,Classroom,240,"Projector, Audio System"
-C101,Classroom,96,Projector
-C102,Classroom,96,Projector
-C104,Classroom,96,Projector
-L105,Lab,40,"Hardware Kits, Computers"
-L106,Lab,40,"Computers, Software"
-L107,Lab,40,"Computers, Software"
-C202,Classroom,96,Projector
-C203,Classroom,96,Projector
-C204,Classroom,96,Projector
-C205,Classroom,96,Projector
-L206,Lab,40,"Hardware Kits, Computers"
-L207,Lab,40,"Computers, Software"
-L208,Lab,40,"Computers, Software"
-C302,Classroom,96,Projector
-C303,Classroom,96,Projector
-C304,Classroom,96,Projector
-C305,Classroom,96,Projector
-L307,Lab,40,"Computers, Research Equipment"
-L308,Lab,40,"Computers, Research Equipment"
-C402,Classroom,96,Projector
-C403,Classroom,78,Projector
-C404,Classroom,78,Projector
-C405,Classroom,78,Projector
-C406,Classroom,78,Projector
-C407,Classroom,78,No Projector
-C408,Classroom,78,Projector
+C101,Classroom,100,Projector
+C102,Classroom,100,Projector
+C104,Classroom,100,Projector
+L105,Lab,50,"Hardware Kits, Computers"
+L106,Lab,50,"Computers, Software"
+L107,Lab,50,"Computers, Software"
+C202,Classroom,100,Projector
+C203,Classroom,100,Projector
+C204,Classroom,100,Projector
+C205,Classroom,100,Projector
+L206,Lab,50,"Hardware Kits, Computers"
+L207,Lab,50,"Computers, Software"
+L208,Lab,50,"Computers, Software"
+C302,Classroom,100,Projector
+C303,Classroom,100,Projector
+C304,Classroom,100,Projector
+C305,Classroom,100,Projector
+L307,Lab,50,"Computers, Research Equipment"
+L308,Lab,50,"Computers, Research Equipment"
+C402,Classroom,100,Projector
+C403,Classroom,100,Projector
+C404,Classroom,100,Projector
+C405,Classroom,100,Projector
+C406,Classroom,100,Projector
+C407,Classroom,100,No Projector
+C408,Classroom,100,Projector

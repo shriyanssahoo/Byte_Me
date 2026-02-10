@@ -1,6 +1,13 @@
 """
 src/scheduler.py
-(UPDATED: Silenced verbose logging and error messages for cleaner terminal output)
+Program Description: This is the "brain" of the class timetable system. It contains the Scheduler class which orchestrates the entire scheduling process. It uses a phased approach:
+Combined Classes: Large classes shared across sections.
+
+Baskets/Electives: Placeholder slots for elective blocks.
+
+Core Courses: Standard lectures/labs for specific sections.
+
+Assignment: replacing elective placeholders with actual specific courses. It manages constraint checking (faculty availability, room capacity, student overlap) and backtracking.
 """
 
 from typing import List, Dict, Optional, Tuple, Set

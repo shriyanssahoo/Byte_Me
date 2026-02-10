@@ -1,6 +1,6 @@
 """
 src/validators.py
-(UPDATED: Suppressed output for Room double-booking and LTPSC mismatches)
+Program Description: This module runs post-scheduling validation checks. After the scheduler generates a timetable, this script iterates through the data structures to ensure no "hard" constraints were violated during the process (e.g., double-booking a room, a student having two classes at once, or faculty teaching without breaks).
 """
 
 from typing import List, Dict, Set

@@ -1,7 +1,6 @@
 """
 src/data_loader.py
-(Corrected with Type 1/Type 2 bundling and 'parent_pseudo_name' tagging)
-(FIXED: Semester 1 electives now schedule only 1 session per week)
+Program Description: This module is responsible for the ingestion and preprocessing of raw data from CSV files. It loads classroom configurations and course details. Crucially, it handles the complex logic of "bundling" elective and basket courses—grouping multiple specific courses under a single pseudo-course entry (e.g., "Basket A") to simplify the scheduling process before expanding them back during assignment.
 """
 
 import csv

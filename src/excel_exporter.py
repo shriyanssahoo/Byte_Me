@@ -1,6 +1,10 @@
 """
 src/excel_exporter.py
-(Corrected to capitalize the session_type for display)
+Program Description: This module handles the output generation. It translates the internal Timetable objects into formatted Excel files (.xlsx). It generates two types of views:
+
+Department View: Timetables organized by student section (e.g., CSE-Sem1).
+
+Faculty View: Timetables organized by instructor. It handles visual styling like coloring courses, merging cells for long sessions, and formatting headers.
 """
 # src/excel_exporter.py
 import io

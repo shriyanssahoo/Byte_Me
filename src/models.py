@@ -1,6 +1,6 @@
 """
 src/models.py
-(FIXED the daily limit violation bug by standardizing on lowercase session types)
+Program Description: This file defines the core data structures (Data Classes) used throughout the application. It acts as the "schema" for the software, defining what a Student, Course, Classroom, and Timetable look like. It contains logic for parsing course structures (L-T-P-S-C), calculating session durations, and managing the grid structure of the weekly timetable.
 """
 
 from typing import List, Optional, Dict, Tuple, Set

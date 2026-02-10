@@ -1,5 +1,6 @@
 """
 src/utils.py
+Program Description: A helper module containing global constants and utility functions used by all other modules. It defines the "physics" of the time grid (e.g., 9:00 AM start, 10-minute slots) and provides tools to convert between human-readable time strings ("09:30") and integer grid indices (slot 3).
 """
 import re
 from datetime import time
